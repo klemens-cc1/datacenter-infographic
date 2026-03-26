@@ -1,520 +1,387 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CITS Data Center Infrastructure</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500&family=Merriweather:ital,wght@0,300;0,400;1,300;1,700&display=swap" rel="stylesheet">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-  <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-    
-    :root {
-      /* CITS Core Palette */
-      --red:      #ba0c2f;
-      --charcoal: #252525;
-      --mid:      #3a3a3a;
-      --gray:     #909090;
-      --light:    #efefef;
-      --white:    #ffffff;
-      --border:   #e0e0e0;
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>CITS Data Center Infrastructure</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500&family=Merriweather:ital,wght@0,300;0,400;1,300;1,700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crossfilter2/1.5.4/crossfilter.min.js"></script>
+<style>
+:root {
+  /* CITS Brand Colors */
+  --cits-red:  #ba0c2f;
+  --charcoal:  #252525;
+  --mid:       #3a3a3a;
+  --gray:      #909090;
+  --light:     #efefef;
+  --white:     #ffffff;
+  --border:    #e0e0e0;
 
-      /* Mapping to Infographic Theme */
-      --bg:       var(--light);
-      --surface:  var(--white);
-      --muted:    var(--gray);
-      --dim:      #555555;
-      --text:     var(--charcoal);
-      --head:     var(--charcoal);
+  /* Theme Mapping */
+  --bg:        var(--light);
+  --surface:   var(--white);
+  --muted:     #cccccc;
+  --dim:       #555555;
+  --text:      var(--charcoal);
+  --head:      var(--charcoal);
+  
+  /* Status Colors */
+  --accent:    var(--cits-red);
+  --amber:     #e0a800;
+  --blue:      #4a90e2;
+  --purple:    #8b5cf6;
+  
+  /* Fonts */
+  --mono:      'Oswald', sans-serif;
+  --serif:     'Merriweather', Georgia, serif;
+}
 
-      /* Semantic Status Colors */
-      --accent:   var(--red);       /* Operational */
-      --amber:    #e0a800;          /* Under construction */
-      --blue:     #4a90e2;          /* Announced */
-      --purple:   #8b5cf6;          /* Proposed */
+* { box-sizing: border-box; margin: 0; padding: 0; }
 
-      /* Fonts */
-      --mono:     'Oswald', sans-serif;
-      --serif:    'Merriweather', Georgia, serif;
-    }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--serif);
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
 
-    body {
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--serif);
-      font-size: 13px;
-      line-height: 1.6;
-      min-height: 100vh;
-    }
+/* ── HEADER ─────────────────────────────────────────── */
+.masthead {
+  border-bottom: 1px solid var(--border);
+  padding: 48px 48px 36px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: end;
+  background: var(--surface);
+}
+.masthead-eyebrow {
+  font-family: var(--mono);
+  font-size: 13px;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.masthead-title {
+  font-family: var(--serif);
+  font-size: clamp(32px, 5vw, 48px);
+  font-weight: 700;
+  color: var(--head);
+  line-height: 1.15;
+  letter-spacing: -.02em;
+}
+.masthead-title em {
+  font-style: italic;
+  color: var(--accent);
+}
+.masthead-meta {
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  color: var(--dim);
+  margin-top: 14px;
+}
+.masthead-meta span { color: var(--text); font-weight: 500; }
 
-    /* ── Header ── */
-    .cits-header {
-      background: var(--charcoal);
-      padding: 0 32px;
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      height: 64px;
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      box-shadow: 0 2px 8px rgba(0,0,0,0.3);
-    }
-    .header-left { display: flex; align-items: center; gap: 14px; }
-    .header-title {
-      font-family: var(--mono);
-      font-size: 13px;
-      letter-spacing: 3px;
-      text-transform: uppercase;
-      color: var(--red);
-    }
-    .header-sub {
-      font-family: var(--serif);
-      font-size: 15px;
-      color: var(--white);
-      font-weight: 300;
-    }
-    .header-divider { width: 1px; height: 28px; background: #444; }
-    .header-tag {
-      font-family: var(--mono);
-      font-size: 12px;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      color: var(--gray);
-    }
+.kpi-row {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: right;
+}
+.kpi {
+  display: flex;
+  flex-direction: column;
+}
+.kpi-num {
+  font-family: var(--serif);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--head);
+  line-height: 1;
+}
+.kpi-lbl {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-top: 5px;
+}
 
-    /* ── Stats bar ── */
-    .stats-bar {
-      background: var(--white);
-      border-bottom: 1px solid var(--border);
-      padding: 10px 32px;
-      display: flex;
-      gap: 28px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .stat-item {
-      font-family: var(--mono);
-      font-size: 12px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--gray);
-    }
-    .stat-item span { 
-      color: var(--charcoal); 
-      font-size: 16px; 
-      font-weight: 700; 
-      margin-left: 4px; 
-      font-family: var(--serif); 
-    }
+/* ── FILTER BAR ──────────────────────────────────────── */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 48px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  box-shadow: 0 2px 8px rgba(0,0,0,0.05);
+}
+.filter-label {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-right: 4px;
+}
+.chip {
+  padding: 4px 12px;
+  border-radius: 4px;
+  border: 1px solid var(--muted);
+  background: transparent;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 0.5px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.chip:hover { border-color: var(--text); color: var(--text); }
+.chip.active { background: var(--charcoal); border-color: var(--charcoal); color: var(--white); font-weight: 400; }
 
-    /* ── Filter Bar ── */
-    .filter-bar {
-      background: var(--white);
-      border-bottom: 1px solid var(--border);
-      padding: 10px 32px;
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      flex-wrap: wrap;
-    }
-    .filter-label {
-      font-family: var(--mono);
-      font-size: 10px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--gray);
-      margin-right: 8px;
-    }
-    .filter-btn {
-      font-family: var(--mono);
-      font-size: 11px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--dim);
-      background: var(--white);
-      padding: 4px 12px;
-      border: 1px solid var(--border);
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .filter-btn:hover { border-color: var(--dim); }
-    .filter-btn.active { color: var(--white); border-color: transparent; }
-    .filter-btn.status-operational.active { background: var(--accent); }
-    .filter-btn.status-construction.active { background: var(--amber); }
-    .filter-btn.status-announced.active { background: var(--blue); }
-    .filter-btn.status-proposed.active { background: var(--purple); }
+.chip.active.status-construction { background: var(--amber); border-color: var(--amber); color: var(--white); }
+.chip.active.status-announced    { background: var(--blue);  border-color: var(--blue);  color: var(--white); }
+.chip.active.status-proposed     { background: var(--purple);border-color: var(--purple);color: var(--white); }
+.chip.active.status-operational  { background: var(--accent);border-color: var(--accent);color: var(--white); }
 
-    .reset-btn {
-      margin-left: auto;
-      font-family: var(--mono);
-      font-size: 11px;
-      letter-spacing: 1px;
-      text-transform: uppercase;
-      color: var(--charcoal);
-      background: none;
-      padding: 4px 12px;
-      border: 1px solid var(--charcoal);
-      cursor: pointer;
-      transition: all 0.15s;
-    }
-    .reset-btn:hover { background: var(--charcoal); color: var(--white); }
+.filter-divider { width: 1px; height: 20px; background: var(--border); margin: 0 6px; }
+.reset-btn {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--dim);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--charcoal);
+  font-family: var(--mono);
+  font-size: 12px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .15s;
+}
+.reset-btn:hover { background: var(--charcoal); color: var(--white); }
+.active-count {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.active-count strong { color: var(--accent); }
 
-    /* ── Layout & Charts ── */
-    .grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 24px;
-      padding: 32px;
-      max-width: 1400px;
-      margin: 0 auto;
-    }
-    .cell {
-      background: var(--white);
-      padding: 24px;
-      border: 1px solid var(--border);
-      border-top: 3px solid var(--charcoal);
-      box-shadow: 0 2px 4px rgba(0,0,0,0.02);
-    }
-    .cell-wide { grid-column: 1 / -1; }
-    
-    .cell-title {
-      font-family: var(--mono);
-      font-size: 12px;
-      letter-spacing: 2px;
-      text-transform: uppercase;
-      color: var(--red);
-      margin-bottom: 16px;
-      border-bottom: 1px solid var(--border);
-      padding-bottom: 8px;
-    }
-    
-    svg { width: 100%; height: 260px; overflow: visible; }
-    .axis text { font-family: var(--mono); font-size: 10px; fill: var(--dim); }
-    .axis line, .axis path { stroke: var(--border); }
-    .tick line { stroke: var(--border); stroke-dasharray: 2,2; }
-    
-    .bar { cursor: pointer; transition: opacity 0.2s; }
-    .bar:hover { opacity: 0.8; }
+/* ── LAYOUT ──────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto auto;
+  gap: 1px;
+  background: var(--border);
+}
+.cell {
+  background: var(--surface);
+  padding: 32px 36px 28px;
+  position: relative;
+}
+.cell-wide { grid-column: 1 / -1; }
 
-    /* ── Tooltip ── */
-    .tooltip {
-      position: absolute;
-      background: var(--charcoal);
-      color: var(--white);
-      padding: 8px 12px;
-      font-family: var(--serif);
-      font-size: 11px;
-      pointer-events: none;
-      opacity: 0;
-      transition: opacity 0.1s;
-      z-index: 1000;
-      box-shadow: 0 4px 8px rgba(0,0,0,0.2);
-    }
-    .tooltip strong { 
-      font-family: var(--mono); 
-      font-size: 12px; 
-      letter-spacing: 1px; 
-      text-transform: uppercase; 
-      color: var(--red); 
-      display: block; 
-      margin-bottom: 4px; 
-    }
-  </style>
+.cell-title {
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 6px;
+}
+.cell-headline {
+  font-family: var(--serif);
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--head);
+  line-height: 1.3;
+  margin-bottom: 20px;
+}
+
+svg text { font-family: var(--mono); }
+.tick line, .domain { stroke: var(--border) !important; }
+.tick text { fill: var(--dim) !important; font-size: 11px !important; }
+.gridline { stroke: var(--border); stroke-dasharray: 2 4; }
+
+/* Tooltip */
+#tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: var(--charcoal);
+  border: 1px solid var(--charcoal);
+  border-radius: 0px;
+  padding: 12px 16px;
+  font-family: var(--serif);
+  font-size: 12px;
+  color: var(--white);
+  max-width: 240px;
+  z-index: 999;
+  display: none;
+  line-height: 1.5;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+}
+#tooltip strong { 
+  font-family: var(--mono); 
+  font-size: 14px; 
+  letter-spacing: 1px; 
+  text-transform: uppercase; 
+  color: var(--accent); 
+  display: block; 
+  margin-bottom: 4px; 
+}
+#tooltip .tip-sub { color: var(--light); font-size: 11px; }
+
+/* Footer */
+.footer {
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+  padding: 20px 48px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  color: var(--dim);
+}
+.footer a { color: var(--dim); text-decoration: none; }
+.export-btn {
+  padding: 8px 16px;
+  border: none;
+  border-radius: 4px;
+  background: var(--charcoal);
+  color: var(--white);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all .15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.export-btn:hover { background: var(--accent); }
+
+/* Bar hover effect */
+.bar-group rect { cursor: pointer; transition: opacity .12s; }
+.bar-group:hover rect { opacity: 0.8 !important; }
+
+/* Print */
+@media print {
+  .filter-bar, .export-btn, .reset-btn { display: none !important; }
+  body { background: #fff; color: #111; }
+  :root { --bg: #fff; --surface: #ffffff; --border: #ddd; --text: #333; --head: #000; --dim: #888; }
+}
+</style>
 </head>
 <body>
 
-  <header class="cits-header">
-    <div class="header-left">
-      <div>
-        <div class="header-title">CITS</div>
-        <div class="header-sub">Data Center Infrastructure</div>
-      </div>
-      <div class="header-divider"></div>
-      <div class="header-tag">Interactive Infographic</div>
-    </div>
-  </header>
+<div id="tooltip"></div>
 
-  <div class="stats-bar">
-    <div class="stat-item">Facilities <span id="kpi-total">—</span></div>
-    <div class="stat-item">Total Capacity <span id="kpi-mw">—</span> MW</div>
-    <div class="stat-item">In Pipeline <span id="kpi-pipeline">—</span></div>
-    <div class="stat-item">Total Sqft <span id="kpi-sqft">—</span></div>
+<header class="masthead">
+  <div>
+    <div class="masthead-eyebrow">CITS Infrastructure Intelligence</div>
+    <h1 class="masthead-title">The <em>Data Center</em><br>Construction Boom</h1>
+    <p class="masthead-meta">
+      United States · <span id="meta-count">59</span> facilities ·
+      <span id="meta-mw">2,173 MW</span> total capacity ·
+      <span>Click any chart element to cross-filter</span>
+    </p>
   </div>
-
-  <div class="filter-bar">
-    <span class="filter-label">Status Filter</span>
-    <button class="filter-btn status-operational active" data-status="operational">Operational</button>
-    <button class="filter-btn status-construction active" data-status="construction">Under Construction</button>
-    <button class="filter-btn status-announced active" data-status="announced">Announced</button>
-    <button class="filter-btn status-proposed active" data-status="proposed">Proposed</button>
-    <button class="reset-btn" id="reset-btn">Reset Filters</button>
-  </div>
-
-  <div class="grid">
-    <div class="cell">
-      <div class="cell-title">Capacity by Status (MW)</div>
-      <svg id="chart-status"></svg>
+  <div class="kpi-row">
+    <div class="kpi">
+      <span class="kpi-num" id="kpi-total">59</span>
+      <span class="kpi-lbl">Facilities</span>
     </div>
-    <div class="cell">
-      <div class="cell-title">Top States by Capacity (MW)</div>
-      <svg id="chart-state"></svg>
+    <div class="kpi">
+      <span class="kpi-num" id="kpi-mw">2,173</span>
+      <span class="kpi-lbl">Megawatts</span>
     </div>
-    <div class="cell cell-wide">
-      <div class="cell-title">Total Infrastructure Timeline (Cumulative MW)</div>
-      <svg id="chart-timeline" style="height: 220px;"></svg>
+    <div class="kpi">
+      <span class="kpi-num" id="kpi-pipeline">9</span>
+      <span class="kpi-lbl">In pipeline</span>
     </div>
   </div>
+</header>
 
-  <div class="tooltip" id="tooltip"></div>
+<div class="filter-bar">
+  <span class="filter-label">Filter</span>
+  <button class="chip status-operational active" data-status="operational">● Operational</button>
+  <button class="chip status-construction active" data-status="construction">● Under construction</button>
+  <button class="chip status-announced active" data-status="announced">● Announced</button>
+  <button class="chip status-proposed active" data-status="proposed">● Proposed</button>
+  <div class="filter-divider"></div>
+  <button class="chip active" data-operator="all">All operators</button>
+  <button class="chip" data-operator="Equinix">Equinix</button>
+  <button class="chip" data-operator="Digital Realty">Digital Realty</button>
+  <button class="chip" data-operator="Hyperscale">Hyperscalers</button>
+  <div class="filter-divider"></div>
+  <span class="active-count"><strong id="active-n">59</strong> shown</span>
+  <button class="reset-btn" id="reset-btn">Reset all</button>
+</div>
 
-  <script>
-    // ── EXPANDED DATASET ─────────────────────────────────────────────────────────
-    const RAW = [
-      {name:"Ashburn VA1",operator:"Equinix",city:"Ashburn",state:"VA",status:"operational",mw:120,sqft:500000,year:2018},
-      {name:"Ashburn VA2",operator:"Digital Realty",city:"Ashburn",state:"VA",status:"construction",mw:80,sqft:350000,year:2024},
-      {name:"Boydton Campus",operator:"Microsoft",city:"Boydton",state:"VA",status:"operational",mw:200,sqft:1100000,year:2015},
-      {name:"Leesburg Campus",operator:"Google",city:"Leesburg",state:"VA",status:"announced",mw:150,sqft:800000,year:2026},
-      {name:"Richmond Campus",operator:"Meta",city:"Richmond",state:"VA",status:"construction",mw:150,sqft:750000,year:2025},
-      {name:"Manassas Site",operator:"Amazon",city:"Manassas",state:"VA",status:"operational",mw:110,sqft:500000,year:2021},
-      {name:"Loudoun Gateway",operator:"Digital Realty",city:"Ashburn",state:"VA",status:"proposed",mw:90,sqft:400000,year:2028},
-      {name:"Gordonsville",operator:"Amazon",city:"Gordonsville",state:"VA",status:"announced",mw:120,sqft:600000,year:2027},
-      {name:"Atlanta Metro",operator:"QTS",city:"Atlanta",state:"GA",status:"operational",mw:180,sqft:950000,year:2019},
-      {name:"Douglasville Site",operator:"Microsoft",city:"Douglasville",state:"GA",status:"construction",mw:90,sqft:400000,year:2025},
-      {name:"Covington Campus",operator:"Meta",city:"Covington",state:"GA",status:"proposed",mw:220,sqft:1200000,year:2027},
-      {name:"Palmetto Campus",operator:"Google",city:"Moncks Corner",state:"SC",status:"operational",mw:95,sqft:450000,year:2013},
-      {name:"Charlotte Site",operator:"TierPoint",city:"Charlotte",state:"NC",status:"operational",mw:25,sqft:120000,year:2016},
-      {name:"Maiden Campus",operator:"Apple",city:"Maiden",state:"NC",status:"operational",mw:140,sqft:700000,year:2012},
-      {name:"Raleigh DC",operator:"CyrusOne",city:"Raleigh",state:"NC",status:"construction",mw:50,sqft:250000,year:2025},
-      {name:"Miami MI1",operator:"Equinix",city:"Miami",state:"FL",status:"operational",mw:45,sqft:200000,year:2014},
-      {name:"Tampa Cloud",operator:"DataBank",city:"Tampa",state:"FL",status:"announced",mw:35,sqft:160000,year:2026},
-      {name:"Chicago CH1",operator:"Equinix",city:"Chicago",state:"IL",status:"operational",mw:65,sqft:300000,year:2012},
-      {name:"Elk Grove Village",operator:"Digital Realty",city:"Elk Grove",state:"IL",status:"construction",mw:100,sqft:450000,year:2024},
-      {name:"Des Moines Cloud",operator:"Microsoft",city:"Des Moines",state:"IA",status:"operational",mw:140,sqft:700000,year:2017},
-      {name:"Council Bluffs",operator:"Google",city:"Council Bluffs",state:"IA",status:"operational",mw:190,sqft:900000,year:2014},
-      {name:"Altoona Campus",operator:"Meta",city:"Altoona",state:"IA",status:"construction",mw:160,sqft:850000,year:2025},
-      {name:"Fargo Site",operator:"Microsoft",city:"Fargo",state:"ND",status:"operational",mw:40,sqft:180000,year:2016},
-      {name:"Omaha Campus",operator:"Google",city:"Omaha",state:"NE",status:"operational",mw:100,sqft:500000,year:2019},
-      {name:"Papillion Site",operator:"Meta",city:"Papillion",state:"NE",status:"construction",mw:130,sqft:650000,year:2024},
-      {name:"Dallas Infomart",operator:"Equinix",city:"Dallas",state:"TX",status:"operational",mw:110,sqft:600000,year:2016},
-      {name:"Fort Worth Site",operator:"Meta",city:"Fort Worth",state:"TX",status:"operational",mw:150,sqft:750000,year:2017},
-      {name:"Midlothian Campus",operator:"Google",city:"Midlothian",state:"TX",status:"construction",mw:130,sqft:650000,year:2024},
-      {name:"San Antonio Cloud",operator:"Microsoft",city:"San Antonio",state:"TX",status:"announced",mw:170,sqft:850000,year:2026},
-      {name:"Austin AUS1",operator:"DataBank",city:"Austin",state:"TX",status:"operational",mw:30,sqft:150000,year:2019},
-      {name:"Houston Site",operator:"CyrusOne",city:"Houston",state:"TX",status:"announced",mw:60,sqft:280000,year:2026},
-      {name:"Tulsa Campus",operator:"TierPoint",city:"Tulsa",state:"OK",status:"operational",mw:15,sqft:75000,year:2015},
-      {name:"Kansas City DC",operator:"LightEdge",city:"Kansas City",state:"MO",status:"operational",mw:20,sqft:100000,year:2018},
-      {name:"St. Louis Campus",operator:"Ballyhoo",city:"St. Louis",state:"MO",status:"announced",mw:35,sqft:150000,year:2027},
-      {name:"Santa Clara SV1",operator:"Equinix",city:"Santa Clara",state:"CA",status:"operational",mw:45,sqft:200000,year:2011},
-      {name:"San Jose Campus",operator:"Digital Realty",city:"San Jose",state:"CA",status:"proposed",mw:85,sqft:400000,year:2028},
-      {name:"Los Angeles LA1",operator:"CoreSite",city:"Los Angeles",state:"CA",status:"operational",mw:35,sqft:150000,year:2013},
-      {name:"Prineville Campus",operator:"Meta",city:"Prineville",state:"OR",status:"operational",mw:210,sqft:1100000,year:2011},
-      {name:"Boardman Site",operator:"Amazon",city:"Boardman",state:"OR",status:"operational",mw:130,sqft:600000,year:2015},
-      {name:"Umatilla Cloud",operator:"Amazon",city:"Umatilla",state:"OR",status:"construction",mw:95,sqft:450000,year:2025},
-      {name:"Hermiston Campus",operator:"Amazon",city:"Hermiston",state:"OR",status:"announced",mw:115,sqft:550000,year:2026},
-      {name:"Hillsboro Campus",operator:"Flexential",city:"Hillsboro",state:"OR",status:"operational",mw:60,sqft:300000,year:2018},
-      {name:"Seattle SEA1",operator:"Equinix",city:"Seattle",state:"WA",status:"operational",mw:30,sqft:150000,year:2015},
-      {name:"Quincy Campus",operator:"Microsoft",city:"Quincy",state:"WA",status:"operational",mw:120,sqft:600000,year:2012},
-      {name:"Wenatchee Site",operator:"Sabey Data Centers",city:"Wenatchee",state:"WA",status:"construction",mw:40,sqft:200000,year:2024},
-      {name:"Reno Sparks",operator:"Apple",city:"Reno",state:"NV",status:"operational",mw:160,sqft:800000,year:2014},
-      {name:"Las Vegas NV1",operator:"Switch",city:"Las Vegas",state:"NV",status:"operational",mw:250,sqft:1500000,year:2010},
-      {name:"Tahoe Reno",operator:"Switch",city:"Reno",state:"NV",status:"construction",mw:180,sqft:950000,year:2024},
-      {name:"Phoenix AZ1",operator:"CyrusOne",city:"Phoenix",state:"AZ",status:"operational",mw:75,sqft:350000,year:2018},
-      {name:"Goodyear Campus",operator:"Vantage",city:"Goodyear",state:"AZ",status:"construction",mw:120,sqft:600000,year:2025},
-      {name:"Mesa Site",operator:"Apple",city:"Mesa",state:"AZ",status:"operational",mw:90,sqft:450000,year:2016},
-      {name:"Salt Lake City 1",operator:"DataBank",city:"Bluffdale",state:"UT",status:"operational",mw:40,sqft:200000,year:2017},
-      {name:"Eagle Mountain",operator:"Meta",city:"Eagle Mountain",state:"UT",status:"construction",mw:140,sqft:750000,year:2024},
-      {name:"Denver DEN1",operator:"CoreSite",city:"Denver",state:"CO",status:"operational",mw:20,sqft:100000,year:2011},
-      {name:"Aurora Campus",operator:"Microsoft",city:"Aurora",state:"CO",status:"proposed",mw:100,sqft:500000,year:2029},
-      {name:"Cheyenne Cloud",operator:"Microsoft",city:"Cheyenne",state:"WY",status:"operational",mw:80,sqft:400000,year:2014},
-      {name:"Bozeman Cloud",operator:"Yellowstone",city:"Bozeman",state:"MT",status:"proposed",mw:15,sqft:70000,year:2029},
-      {name:"New Albany",operator:"Google",city:"New Albany",state:"OH",status:"operational",mw:110,sqft:550000,year:2019},
-      {name:"Columbus Site",operator:"Amazon",city:"Columbus",state:"OH",status:"announced",mw:160,sqft:800000,year:2026},
-      {name:"Minneapolis Site",operator:"Cologix",city:"Minneapolis",state:"MN",status:"operational",mw:15,sqft:80000,year:2016},
-      {name:"Detroit DC1",operator:"11:11 Systems",city:"Detroit",state:"MI",status:"operational",mw:10,sqft:50000,year:2014},
-      {name:"Boston BOS1",operator:"Equinix",city:"Boston",state:"MA",status:"operational",mw:25,sqft:120000,year:2013},
-      {name:"Secaucus Campus",operator:"CoreSite",city:"Secaucus",state:"NJ",status:"operational",mw:55,sqft:260000,year:2015},
-      {name:"Clifton Site",operator:"Digital Realty",city:"Clifton",state:"NJ",status:"construction",mw:45,sqft:200000,year:2025},
-      {name:"Philadelphia PHL1",operator:"TierPoint",city:"Philadelphia",state:"PA",status:"operational",mw:18,sqft:90000,year:2017},
-      {name:"New Orleans Cloud",operator:"Ventra",city:"New Orleans",state:"LA",status:"proposed",mw:25,sqft:120000,year:2028}
-    ];
+<main class="grid">
 
-    // ── INTERACTIVE LOGIC ────────────────────────────────────────────────────────
-    let activeStatuses = new Set(["operational", "construction", "announced", "proposed"]);
-    
-    // Resolving CSS Variable values for D3 Rendering
-    const colors = {
-      operational: "var(--accent)",
-      construction: "var(--amber)",
-      announced: "var(--blue)",
-      proposed: "var(--purple)"
-    };
+  <div class="cell cell-wide" id="cell-timeline">
+    <div class="cell-title">Cumulative growth</div>
+    <div class="cell-headline">Capacity & facility count by year opened</div>
+    <svg id="chart-timeline"></svg>
+  </div>
 
-    const tt = document.getElementById("tooltip");
-    const showTip = (html, e) => {
-      tt.innerHTML = html;
-      tt.style.opacity = 1;
-      tt.style.left = e.pageX + 15 + "px";
-      tt.style.top = e.pageY + 15 + "px";
-    };
-    const moveTip = (e) => {
-      tt.style.left = e.pageX + 15 + "px";
-      tt.style.top = e.pageY + 15 + "px";
-    };
-    const hideTip = () => tt.style.opacity = 0;
+  <div class="cell" id="cell-states">
+    <div class="cell-title">Regional concentration</div>
+    <div class="cell-headline">MW by state</div>
+    <svg id="chart-states"></svg>
+  </div>
 
-    function renderAll() {
-      const data = RAW.filter(d => activeStatuses.has(d.status));
-      
-      // Update KPIs
-      document.getElementById("kpi-total").innerText = data.length;
-      document.getElementById("kpi-mw").innerText = d3.sum(data, d => d.mw).toLocaleString();
-      document.getElementById("kpi-pipeline").innerText = data.filter(d => d.status !== "operational").length;
-      document.getElementById("kpi-sqft").innerText = d3.sum(data, d => d.sqft).toLocaleString();
+  <div class="cell" id="cell-operators">
+    <div class="cell-title">Market share</div>
+    <div class="cell-headline">Operators by total capacity</div>
+    <svg id="chart-operators"></svg>
+  </div>
 
-      // Render Dashboard Elements
-      renderChartStatus(data);
-      renderChartState(data);
-      renderChartTimeline(data);
-    }
+  <div class="cell" id="cell-status">
+    <div class="cell-title">Pipeline breakdown</div>
+    <div class="cell-headline">Operational vs. in-pipeline</div>
+    <svg id="chart-status"></svg>
+  </div>
 
-    function renderChartStatus(data) {
-      const svg = d3.select("#chart-status");
-      svg.selectAll("*").remove();
-      const node = svg.node();
-      if (!node) return;
-      
-      const W = node.clientWidth, H = 260;
-      const m = {t: 20, r: 20, b: 30, l: 50};
-      
-      const rolled = d3.rollup(data, v => d3.sum(v, d => d.mw), d => d.status);
-      const statuses = ["operational", "construction", "announced", "proposed"]
-        .map(s => ({status: s, mw: rolled.get(s) || 0}));
+  <div class="cell" id="cell-scatter">
+    <div class="cell-title">Facility profile</div>
+    <div class="cell-headline">Capacity (MW) vs. year — sized by floor space</div>
+    <svg id="chart-scatter"></svg>
+  </div>
 
-      const x = d3.scaleBand().domain(statuses.map(d => d.status)).range([m.l, W - m.r]).padding(0.3);
-      const y = d3.scaleLinear().domain([0, d3.max(statuses, d => d.mw) || 100]).nice().range([H - m.b, m.t]);
+</main>
 
-      svg.append("g").attr("transform", `translate(0,${H - m.b})`).attr("class", "axis")
-        .call(d3.axisBottom(x).tickFormat(d => d.charAt(0).toUpperCase() + d.slice(1)));
-      
-      svg.append("g").attr("transform", `translate(${m.l},0)`).attr("class", "axis")
-        .call(d3.axisLeft(y).ticks(5));
+<footer class="footer">
+  <span>Sources: DataCenterMap.com · Equinix · Digital Realty · operator press releases · permit filings</span>
+  <button class="export-btn" id="export-btn">⬇ Export PDF / PNG</button>
+</footer>
 
-      svg.append("g").selectAll("rect").data(statuses).join("rect")
-        .attr("class", "bar")
-        .attr("x", d => x(d.status)).attr("width", x.bandwidth())
-        .attr("y", d => y(d.mw)).attr("height", d => H - m.b - y(d.mw))
-        .attr("fill", d => colors[d.status])
-        .on("mouseover", (e, d) => showTip(`<strong>${d.status}</strong>${d.mw.toLocaleString()} MW`, e))
-        .on("mousemove", moveTip).on("mouseout", hideTip);
-    }
-
-    function renderChartState(data) {
-      const svg = d3.select("#chart-state");
-      svg.selectAll("*").remove();
-      const node = svg.node();
-      if (!node) return;
-
-      const W = node.clientWidth, H = 260;
-      const m = {t: 20, r: 20, b: 30, l: 40};
-
-      const rolled = Array.from(d3.rollup(data, v => d3.sum(v, d => d.mw), d => d.state))
-        .map(([state, mw]) => ({state, mw}))
-        .sort((a,b) => b.mw - a.mw).slice(0, 8); // Display top 8 states
-
-      const x = d3.scaleBand().domain(rolled.map(d => d.state)).range([m.l, W - m.r]).padding(0.2);
-      const y = d3.scaleLinear().domain([0, d3.max(rolled, d => d.mw) || 100]).nice().range([H - m.b, m.t]);
-
-      svg.append("g").attr("transform", `translate(0,${H - m.b})`).attr("class", "axis")
-        .call(d3.axisBottom(x));
-      
-      svg.append("g").attr("transform", `translate(${m.l},0)`).attr("class", "axis")
-        .call(d3.axisLeft(y).ticks(5));
-
-      svg.append("g").selectAll("rect").data(rolled).join("rect")
-        .attr("class", "bar")
-        .attr("x", d => x(d.state)).attr("width", x.bandwidth())
-        .attr("y", d => y(d.mw)).attr("height", d => H - m.b - y(d.mw))
-        .attr("fill", "var(--charcoal)")
-        .on("mouseover", (e, d) => showTip(`<strong>${d.state}</strong>${d.mw.toLocaleString()} MW Capacity`, e))
-        .on("mousemove", moveTip).on("mouseout", hideTip);
-    }
-
-    function renderChartTimeline(data) {
-      const svg = d3.select("#chart-timeline");
-      svg.selectAll("*").remove();
-      const node = svg.node();
-      if (!node) return;
-
-      const W = node.clientWidth, H = 220;
-      const m = {t: 20, r: 30, b: 30, l: 50};
-
-      const rolled = Array.from(d3.rollup(data, v => d3.sum(v, d => d.mw), d => d.year))
-        .map(([year, mw]) => ({year, mw}))
-        .sort((a,b) => a.year - b.year);
-
-      let cum = 0;
-      const cumData = rolled.map(d => { cum += d.mw; return {year: d.year, cum}; });
-
-      if(!cumData.length) return;
-
-      const x = d3.scaleLinear().domain(d3.extent(cumData, d => d.year)).range([m.l, W - m.r]);
-      const y = d3.scaleLinear().domain([0, d3.max(cumData, d => d.cum) || 100]).nice().range([H - m.b, m.t]);
-
-      svg.append("g").attr("transform", `translate(0,${H - m.b})`).attr("class", "axis")
-        .call(d3.axisBottom(x).tickFormat(d3.format("d")).ticks(8));
-      
-      svg.append("g").attr("transform", `translate(${m.l},0)`).attr("class", "axis")
-        .call(d3.axisLeft(y).ticks(5));
-
-      const line = d3.line().x(d => x(d.year)).y(d => y(d.cum)).curve(d3.curveMonotoneX);
-
-      svg.append("path")
-        .datum(cumData)
-        .attr("fill", "none")
-        .attr("stroke", "var(--red)")
-        .attr("stroke-width", 3)
-        .attr("d", line);
-
-      svg.selectAll("circle").data(cumData).join("circle")
-        .attr("cx", d => x(d.year)).attr("cy", d => y(d.cum)).attr("r", 4)
-        .attr("fill", "var(--red)")
-        .style("cursor", "pointer")
-        .on("mouseover", (e, d) => showTip(`<strong>${d.year}</strong>Cumulative: ${d.cum.toLocaleString()} MW`, e))
-        .on("mousemove", moveTip).on("mouseout", hideTip);
-    }
-
-    // Interactive Listeners
-    document.querySelectorAll(".filter-btn").forEach(btn => {
-      btn.addEventListener("click", () => {
-        const status = btn.dataset.status;
-        if (activeStatuses.has(status)) {
-          activeStatuses.delete(status);
-          btn.classList.remove("active");
-        } else {
-          activeStatuses.add(status);
-          btn.classList.add("active");
-        }
-        renderAll();
-      });
-    });
-
-    document.getElementById("reset-btn").addEventListener("click", () => {
-      activeStatuses = new Set(["operational", "construction", "announced", "proposed"]);
-      document.querySelectorAll(".filter-btn").forEach(b => b.classList.add("active"));
-      renderAll();
-    });
-
-    // Make charts responsive
-    let resizeTimer;
-    window.addEventListener("resize", () => {
-      clearTimeout(resizeTimer);
-      resizeTimer = setTimeout(renderAll, 150);
-    });
-
-    // Initial render
-    renderAll();
-  </script>
-</body>
-</html>
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const RAW = [
+  {name:"Equinix DC1",operator:"Equinix",city:"Ashburn",state:"VA",status:"operational",mw:60,sqft:345000,tier:3,year:1999},
+  {name:"Equinix DC10",operator:"Equinix",city:"Ashburn",state:"VA",status:"operational",mw:70,sqft:410000,tier:3,year:2010},
+  {name:"Digital Realty IAD",operator:"Digital Realty",city:"Ashburn",state:"VA",status:"operational",mw:80,sqft:500000,tier:3,year:2005},
+  {name:"QTS Northern Virginia",operator:"QTS",city:"Manassas",state:"VA",status:"construction",mw:120,sqft:600000,tier:3,year:2026},
+  {name:"Iron Mountain NOVA",operator:"Iron Mountain",city:"Ashburn",state:"VA",status:"announced",mw:40,sqft:220000,tier:3,year:2027},
+  {name:"Equinix SV1",operator:"Equinix",city:"San Jose",state:"CA",status:"operational",mw:18,sqft:107000,tier:3,year:1999},
+  {name:"Equinix SV5",operator:"Equinix",city:"San Jose",state:"CA",status:"operational",mw:16,sqft:91000,tier:3,year:200
