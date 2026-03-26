@@ -7,7 +7,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@300;400;500&family=Merriweather:ital,wght@0,300;0,400;1,300;1,700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/crossfilter2/1.5.4/crossfilter.min.js"></script>
 <style>
 :root {
   /* CITS Brand Colors */
@@ -19,7 +18,7 @@
   --white:     #ffffff;
   --border:    #e0e0e0;
 
-  /* Theme Mapping */
+  /* Dashboard Mapping */
   --bg:        var(--light);
   --surface:   var(--white);
   --muted:     #cccccc;
@@ -51,47 +50,45 @@ body {
 
 /* ── HEADER ─────────────────────────────────────────── */
 .masthead {
-  border-bottom: 1px solid var(--border);
-  padding: 48px 48px 36px;
+  background: var(--charcoal);
+  border-bottom: 3px solid var(--cits-red);
+  padding: 36px 48px;
   display: grid;
   grid-template-columns: 1fr auto;
   gap: 24px;
   align-items: end;
-  background: var(--surface);
 }
 .masthead-eyebrow {
   font-family: var(--mono);
   font-size: 13px;
-  letter-spacing: 3px;
+  letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--cits-red);
   margin-bottom: 10px;
 }
 .masthead-title {
   font-family: var(--serif);
-  font-size: clamp(32px, 5vw, 48px);
+  font-size: clamp(32px, 5vw, 42px);
   font-weight: 700;
-  color: var(--head);
+  color: var(--white);
   line-height: 1.15;
-  letter-spacing: -.02em;
 }
 .masthead-title em {
   font-style: italic;
-  color: var(--accent);
+  font-weight: 300;
 }
 .masthead-meta {
   font-family: var(--mono);
   font-size: 12px;
   letter-spacing: 0.5px;
-  color: var(--dim);
+  color: var(--gray);
   margin-top: 14px;
 }
-.masthead-meta span { color: var(--text); font-weight: 500; }
+.masthead-meta span { color: var(--white); font-weight: 500; }
 
 .kpi-row {
   display: flex;
-  flex-direction: column;
-  gap: 14px;
+  gap: 32px;
   text-align: right;
 }
 .kpi {
@@ -102,7 +99,7 @@ body {
   font-family: var(--serif);
   font-size: 32px;
   font-weight: 700;
-  color: var(--head);
+  color: var(--white);
   line-height: 1;
 }
 .kpi-lbl {
@@ -110,8 +107,8 @@ body {
   font-size: 11px;
   letter-spacing: 1.5px;
   text-transform: uppercase;
-  color: var(--dim);
-  margin-top: 5px;
+  color: var(--gray);
+  margin-top: 8px;
 }
 
 /* ── FILTER BAR ──────────────────────────────────────── */
@@ -150,7 +147,7 @@ body {
   white-space: nowrap;
 }
 .chip:hover { border-color: var(--text); color: var(--text); }
-.chip.active { background: var(--charcoal); border-color: var(--charcoal); color: var(--white); font-weight: 400; }
+.chip.active { background: var(--mid); border-color: var(--mid); color: var(--white); font-weight: 400; }
 
 .chip.active.status-construction { background: var(--amber); border-color: var(--amber); color: var(--white); }
 .chip.active.status-announced    { background: var(--blue);  border-color: var(--blue);  color: var(--white); }
@@ -201,7 +198,7 @@ body {
   font-size: 11px;
   letter-spacing: 2px;
   text-transform: uppercase;
-  color: var(--accent);
+  color: var(--cits-red);
   margin-bottom: 6px;
 }
 .cell-headline {
@@ -224,7 +221,7 @@ svg text { font-family: var(--mono); }
   pointer-events: none;
   background: var(--charcoal);
   border: 1px solid var(--charcoal);
-  border-radius: 0px;
+  border-left: 3px solid var(--cits-red);
   padding: 12px 16px;
   font-family: var(--serif);
   font-size: 12px;
@@ -240,11 +237,11 @@ svg text { font-family: var(--mono); }
   font-size: 14px; 
   letter-spacing: 1px; 
   text-transform: uppercase; 
-  color: var(--accent); 
+  color: var(--white); 
   display: block; 
   margin-bottom: 4px; 
 }
-#tooltip .tip-sub { color: var(--light); font-size: 11px; }
+#tooltip .tip-sub { color: var(--gray); font-size: 11px; }
 
 /* Footer */
 .footer {
@@ -337,7 +334,6 @@ svg text { font-family: var(--mono); }
 </div>
 
 <main class="grid">
-
   <div class="cell cell-wide" id="cell-timeline">
     <div class="cell-title">Cumulative growth</div>
     <div class="cell-headline">Capacity & facility count by year opened</div>
@@ -367,7 +363,6 @@ svg text { font-family: var(--mono); }
     <div class="cell-headline">Capacity (MW) vs. year — sized by floor space</div>
     <svg id="chart-scatter"></svg>
   </div>
-
 </main>
 
 <footer class="footer">
@@ -384,4 +379,29 @@ const RAW = [
   {name:"QTS Northern Virginia",operator:"QTS",city:"Manassas",state:"VA",status:"construction",mw:120,sqft:600000,tier:3,year:2026},
   {name:"Iron Mountain NOVA",operator:"Iron Mountain",city:"Ashburn",state:"VA",status:"announced",mw:40,sqft:220000,tier:3,year:2027},
   {name:"Equinix SV1",operator:"Equinix",city:"San Jose",state:"CA",status:"operational",mw:18,sqft:107000,tier:3,year:1999},
-  {name:"Equinix SV5",operator:"Equinix",city:"San Jose",state:"CA",status:"operational",mw:16,sqft:91000,tier:3,year:200
+  {name:"Equinix SV5",operator:"Equinix",city:"San Jose",state:"CA",status:"operational",mw:16,sqft:91000,tier:3,year:2007},
+  {name:"Digital Realty SFO",operator:"Digital Realty",city:"Santa Clara",state:"CA",status:"operational",mw:30,sqft:180000,tier:3,year:2004},
+  {name:"Oracle Cloud SCC",operator:"Oracle",city:"Santa Clara",state:"CA",status:"operational",mw:25,sqft:160000,tier:3,year:2016},
+  {name:"Meta Fremont DC",operator:"Meta",city:"Fremont",state:"CA",status:"operational",mw:110,sqft:650000,tier:null,year:2015},
+  {name:"Equinix DA2",operator:"Equinix",city:"Dallas",state:"TX",status:"operational",mw:14,sqft:82000,tier:3,year:2000},
+  {name:"Equinix DA6",operator:"Equinix",city:"Fort Worth",state:"TX",status:"operational",mw:17,sqft:95000,tier:3,year:2011},
+  {name:"Aligned DFW",operator:"Aligned Data Centers",city:"Irving",state:"TX",status:"operational",mw:50,sqft:310000,tier:3,year:2017},
+  {name:"AWS DFW Campus",operator:"Amazon Web Services",city:"Northlake",state:"TX",status:"construction",mw:200,sqft:1200000,tier:null,year:2026},
+  {name:"CyrusOne Houston",operator:"CyrusOne",city:"Houston",state:"TX",status:"operational",mw:22,sqft:135000,tier:3,year:2014},
+  {name:"Equinix NY4",operator:"Equinix",city:"Secaucus",state:"NJ",status:"operational",mw:19,sqft:112000,tier:3,year:2000},
+  {name:"Equinix NY5",operator:"Equinix",city:"Secaucus",state:"NJ",status:"operational",mw:18,sqft:104000,tier:3,year:2003},
+  {name:"Digital Realty NYC",operator:"Digital Realty",city:"Brooklyn",state:"NY",status:"operational",mw:12,sqft:75000,tier:3,year:2012},
+  {name:"Vantage NYC",operator:"Vantage Data Centers",city:"Clifton",state:"NJ",status:"construction",mw:64,sqft:380000,tier:3,year:2025},
+  {name:"Equinix CH1",operator:"Equinix",city:"Chicago",state:"IL",status:"operational",mw:9,sqft:54000,tier:3,year:2000},
+  {name:"CyrusOne Chicago",operator:"CyrusOne",city:"Elk Grove Village",state:"IL",status:"operational",mw:25,sqft:155000,tier:3,year:2016},
+  {name:"QTS Chicago",operator:"QTS",city:"Elk Grove Village",state:"IL",status:"announced",mw:48,sqft:280000,tier:3,year:2026},
+  {name:"Equinix SE2",operator:"Equinix",city:"Seattle",state:"WA",status:"operational",mw:10,sqft:60000,tier:3,year:2002},
+  {name:"Microsoft Data Center",operator:"Microsoft",city:"Redmond",state:"WA",status:"operational",mw:95,sqft:560000,tier:null,year:2010},
+  {name:"Microsoft Quincy",operator:"Microsoft",city:"Quincy",state:"WA",status:"operational",mw:200,sqft:1100000,tier:null,year:2007},
+  {name:"Equinix PD9",operator:"Equinix",city:"Hillsboro",state:"OR",status:"operational",mw:22,sqft:130000,tier:3,year:2018},
+  {name:"Google The Dalles",operator:"Google",city:"The Dalles",state:"OR",status:"operational",mw:150,sqft:900000,tier:null,year:2006},
+  {name:"Equinix AT1",operator:"Equinix",city:"Atlanta",state:"GA",status:"operational",mw:14,sqft:83000,tier:3,year:2000},
+  {name:"QTS Atlanta",operator:"QTS",city:"Suwanee",state:"GA",status:"operational",mw:37,sqft:220000,tier:3,year:2012},
+  {name:"Switch Atlanta",operator:"Switch",city:"Atlanta",state:"GA",status:"announced",mw:100,sqft:600000,tier:4,year:2027},
+  {name:"Equinix DE1",operator:"Equinix",city:"Denver",state:"CO",status:"operational",mw:7,sqft:44000,tier:3,year:2003},
+  {name:"CyrusOne Denver",operator:"CyrusOne",
