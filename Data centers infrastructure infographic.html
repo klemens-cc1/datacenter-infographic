@@ -1,0 +1,864 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>US Data Center Construction — Interactive Infographic</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,300&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/crossfilter2/1.5.4/crossfilter.min.js"></script>
+<style>
+:root {
+  --bg:       #0b0f0e;
+  --surface:  #111714;
+  --border:   #1e2822;
+  --muted:    #3a4a40;
+  --dim:      #5a7060;
+  --text:     #d4e8d8;
+  --head:     #f0f7f0;
+  --accent:   #4ade80;
+  --amber:    #fbbf24;
+  --blue:     #60a5fa;
+  --coral:    #f87171;
+  --purple:   #a78bfa;
+  --mono:     'DM Mono', monospace;
+  --serif:    'Fraunces', Georgia, serif;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.6;
+  min-height: 100vh;
+}
+
+/* ── HEADER ─────────────────────────────────────────── */
+.masthead {
+  border-bottom: 1px solid var(--border);
+  padding: 48px 48px 36px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 24px;
+  align-items: end;
+}
+.masthead-eyebrow {
+  font-size: 10px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--accent);
+  margin-bottom: 10px;
+}
+.masthead-title {
+  font-family: var(--serif);
+  font-size: clamp(32px, 5vw, 56px);
+  font-weight: 700;
+  color: var(--head);
+  line-height: 1.05;
+  letter-spacing: -.02em;
+}
+.masthead-title em {
+  font-style: italic;
+  color: var(--accent);
+}
+.masthead-meta {
+  font-size: 11px;
+  color: var(--dim);
+  margin-top: 12px;
+}
+.masthead-meta span { color: var(--text); }
+
+.kpi-row {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: right;
+}
+.kpi {
+  display: flex;
+  flex-direction: column;
+}
+.kpi-num {
+  font-family: var(--serif);
+  font-size: 32px;
+  font-weight: 700;
+  color: var(--head);
+  line-height: 1;
+  letter-spacing: -.03em;
+}
+.kpi-lbl {
+  font-size: 10px;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-top: 3px;
+}
+
+/* ── FILTER BAR ──────────────────────────────────────── */
+.filter-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 48px;
+  border-bottom: 1px solid var(--border);
+  flex-wrap: wrap;
+  background: var(--surface);
+  position: sticky;
+  top: 0;
+  z-index: 100;
+}
+.filter-label {
+  font-size: 10px;
+  letter-spacing: .15em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-right: 4px;
+}
+.chip {
+  padding: 4px 12px;
+  border-radius: 20px;
+  border: 1px solid var(--muted);
+  background: transparent;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .15s;
+  white-space: nowrap;
+}
+.chip:hover { border-color: var(--text); color: var(--text); }
+.chip.active { background: var(--accent); border-color: var(--accent); color: #0b0f0e; font-weight: 600; }
+.chip.status-construction { --ac: var(--amber); }
+.chip.status-announced    { --ac: var(--blue); }
+.chip.status-proposed     { --ac: var(--purple); }
+.chip.status-operational  { --ac: var(--accent); }
+.chip.active.status-construction { background: var(--amber); border-color: var(--amber); color: #0b0f0e; }
+.chip.active.status-announced    { background: var(--blue);  border-color: var(--blue);  color: #0b0f0e; }
+.chip.active.status-proposed     { background: var(--purple);border-color: var(--purple);color: #0b0f0e; }
+.filter-divider { width: 1px; height: 20px; background: var(--border); margin: 0 6px; }
+.reset-btn {
+  margin-left: auto;
+  padding: 4px 12px;
+  border: 1px solid var(--muted);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .15s;
+}
+.reset-btn:hover { color: var(--text); border-color: var(--text); }
+.active-count {
+  font-size: 11px;
+  color: var(--dim);
+  white-space: nowrap;
+}
+.active-count strong { color: var(--accent); }
+
+/* ── LAYOUT ──────────────────────────────────────────── */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: auto auto auto;
+  gap: 1px;
+  background: var(--border);
+}
+.cell {
+  background: var(--bg);
+  padding: 32px 36px 28px;
+  position: relative;
+}
+.cell-wide { grid-column: 1 / -1; }
+
+.cell-title {
+  font-size: 10px;
+  letter-spacing: .18em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 6px;
+}
+.cell-headline {
+  font-family: var(--serif);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--head);
+  line-height: 1.2;
+  letter-spacing: -.01em;
+  margin-bottom: 20px;
+}
+
+svg text { font-family: var(--mono); }
+.tick line, .domain { stroke: var(--border) !important; }
+.tick text { fill: var(--dim) !important; font-size: 11px !important; }
+.gridline { stroke: var(--border); stroke-dasharray: 2 4; }
+
+/* Tooltip */
+#tooltip {
+  position: fixed;
+  pointer-events: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: var(--text);
+  max-width: 220px;
+  z-index: 999;
+  display: none;
+  line-height: 1.5;
+}
+#tooltip strong { color: var(--head); display: block; margin-bottom: 2px; }
+#tooltip .tip-sub { color: var(--dim); font-size: 11px; }
+
+/* Footer */
+.footer {
+  border-top: 1px solid var(--border);
+  padding: 20px 48px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 11px;
+  color: var(--dim);
+}
+.footer a { color: var(--dim); text-decoration: none; }
+.export-btn {
+  padding: 6px 16px;
+  border: 1px solid var(--muted);
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 11px;
+  cursor: pointer;
+  transition: all .15s;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.export-btn:hover { background: var(--accent); border-color: var(--accent); color: #0b0f0e; }
+
+/* Bar hover effect */
+.bar-group rect { cursor: pointer; transition: opacity .12s; }
+.bar-group:hover rect { opacity: 1 !important; }
+.bar-group rect.faded { opacity: 0.25; }
+
+/* Print */
+@media print {
+  .filter-bar, .export-btn, .reset-btn { display: none !important; }
+  body { background: #fff; color: #111; }
+  :root { --bg: #fff; --surface: #f8f8f8; --border: #ddd; --text: #333; --head: #000; --dim: #888; }
+}
+</style>
+</head>
+<body>
+
+<div id="tooltip"></div>
+
+<header class="masthead">
+  <div>
+    <div class="masthead-eyebrow">Infrastructure Intelligence</div>
+    <h1 class="masthead-title">The <em>Data Center</em><br>Construction Boom</h1>
+    <p class="masthead-meta">
+      United States · <span id="meta-count">59</span> facilities ·
+      <span id="meta-mw">2,173 MW</span> total capacity ·
+      <span>Click any chart element to cross-filter</span>
+    </p>
+  </div>
+  <div class="kpi-row">
+    <div class="kpi">
+      <span class="kpi-num" id="kpi-total">59</span>
+      <span class="kpi-lbl">Facilities</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-num" id="kpi-mw">2,173</span>
+      <span class="kpi-lbl">Megawatts</span>
+    </div>
+    <div class="kpi">
+      <span class="kpi-num" id="kpi-pipeline">9</span>
+      <span class="kpi-lbl">In pipeline</span>
+    </div>
+  </div>
+</header>
+
+<div class="filter-bar">
+  <span class="filter-label">Filter</span>
+  <button class="chip status-operational active" data-status="operational">● Operational</button>
+  <button class="chip status-construction active" data-status="construction">● Under construction</button>
+  <button class="chip status-announced active" data-status="announced">● Announced</button>
+  <button class="chip status-proposed active" data-status="proposed">● Proposed</button>
+  <div class="filter-divider"></div>
+  <button class="chip active" data-operator="all">All operators</button>
+  <button class="chip" data-operator="Equinix">Equinix</button>
+  <button class="chip" data-operator="Digital Realty">Digital Realty</button>
+  <button class="chip" data-operator="Hyperscale">Hyperscalers</button>
+  <div class="filter-divider"></div>
+  <span class="active-count"><strong id="active-n">59</strong> shown</span>
+  <button class="reset-btn" id="reset-btn">Reset all</button>
+</div>
+
+<main class="grid">
+
+  <!-- Row 1: Time series (wide) -->
+  <div class="cell cell-wide" id="cell-timeline">
+    <div class="cell-title">Cumulative growth</div>
+    <div class="cell-headline">Capacity & facility count by year opened</div>
+    <svg id="chart-timeline"></svg>
+  </div>
+
+  <!-- Row 2: State bar + Operator treemap -->
+  <div class="cell" id="cell-states">
+    <div class="cell-title">Regional concentration</div>
+    <div class="cell-headline">MW by state</div>
+    <svg id="chart-states"></svg>
+  </div>
+
+  <div class="cell" id="cell-operators">
+    <div class="cell-title">Market share</div>
+    <div class="cell-headline">Operators by total capacity</div>
+    <svg id="chart-operators"></svg>
+  </div>
+
+  <!-- Row 3: Status donut + MW bubble scatter -->
+  <div class="cell" id="cell-status">
+    <div class="cell-title">Pipeline breakdown</div>
+    <div class="cell-headline">Operational vs. in-pipeline</div>
+    <svg id="chart-status"></svg>
+  </div>
+
+  <div class="cell" id="cell-scatter">
+    <div class="cell-title">Facility profile</div>
+    <div class="cell-headline">Capacity (MW) vs. year — sized by floor space</div>
+    <svg id="chart-scatter"></svg>
+  </div>
+
+</main>
+
+<footer class="footer">
+  <span>Sources: DataCenterMap.com · Equinix · Digital Realty · operator press releases · permit filings</span>
+  <button class="export-btn" id="export-btn">⬇ Export PNG</button>
+</footer>
+
+<script>
+// ─── DATA ────────────────────────────────────────────────────────────────────
+const RAW = [
+  {name:"Equinix DC1",operator:"Equinix",city:"Ashburn",state:"VA",status:"operational",mw:60,sqft:345000,tier:3,year:1999},
+  {name:"Equinix DC10",operator:"Equinix",city:"Ashburn",state:"VA",status:"operational",mw:70,sqft:410000,tier:3,year:2010},
+  {name:"Digital Realty IAD",operator:"Digital Realty",city:"Ashburn",state:"VA",status:"operational",mw:80,sqft:500000,tier:3,year:2005},
+  {name:"QTS Northern Virginia",operator:"QTS",city:"Manassas",state:"VA",status:"construction",mw:120,sqft:600000,tier:3,year:2026},
+  {name:"Iron Mountain NOVA",operator:"Iron Mountain",city:"Ashburn",state:"VA",status:"announced",mw:40,sqft:220000,tier:3,year:2027},
+  {name:"Equinix SV1",operator:"Equinix",city:"San Jose",state:"CA",status:"operational",mw:18,sqft:107000,tier:3,year:1999},
+  {name:"Equinix SV5",operator:"Equinix",city:"San Jose",state:"CA",status:"operational",mw:16,sqft:91000,tier:3,year:2007},
+  {name:"Digital Realty SFO",operator:"Digital Realty",city:"Santa Clara",state:"CA",status:"operational",mw:30,sqft:180000,tier:3,year:2004},
+  {name:"Oracle Cloud SCC",operator:"Oracle",city:"Santa Clara",state:"CA",status:"operational",mw:25,sqft:160000,tier:3,year:2016},
+  {name:"Meta Fremont DC",operator:"Meta",city:"Fremont",state:"CA",status:"operational",mw:110,sqft:650000,tier:null,year:2015},
+  {name:"Equinix DA2",operator:"Equinix",city:"Dallas",state:"TX",status:"operational",mw:14,sqft:82000,tier:3,year:2000},
+  {name:"Equinix DA6",operator:"Equinix",city:"Fort Worth",state:"TX",status:"operational",mw:17,sqft:95000,tier:3,year:2011},
+  {name:"Aligned DFW",operator:"Aligned Data Centers",city:"Irving",state:"TX",status:"operational",mw:50,sqft:310000,tier:3,year:2017},
+  {name:"AWS DFW Campus",operator:"Amazon Web Services",city:"Northlake",state:"TX",status:"construction",mw:200,sqft:1200000,tier:null,year:2026},
+  {name:"CyrusOne Houston",operator:"CyrusOne",city:"Houston",state:"TX",status:"operational",mw:22,sqft:135000,tier:3,year:2014},
+  {name:"Equinix NY4",operator:"Equinix",city:"Secaucus",state:"NJ",status:"operational",mw:19,sqft:112000,tier:3,year:2000},
+  {name:"Equinix NY5",operator:"Equinix",city:"Secaucus",state:"NJ",status:"operational",mw:18,sqft:104000,tier:3,year:2003},
+  {name:"Digital Realty NYC",operator:"Digital Realty",city:"Brooklyn",state:"NY",status:"operational",mw:12,sqft:75000,tier:3,year:2012},
+  {name:"Vantage NYC",operator:"Vantage Data Centers",city:"Clifton",state:"NJ",status:"construction",mw:64,sqft:380000,tier:3,year:2025},
+  {name:"Equinix CH1",operator:"Equinix",city:"Chicago",state:"IL",status:"operational",mw:9,sqft:54000,tier:3,year:2000},
+  {name:"CyrusOne Chicago",operator:"CyrusOne",city:"Elk Grove Village",state:"IL",status:"operational",mw:25,sqft:155000,tier:3,year:2016},
+  {name:"QTS Chicago",operator:"QTS",city:"Elk Grove Village",state:"IL",status:"announced",mw:48,sqft:280000,tier:3,year:2026},
+  {name:"Equinix SE2",operator:"Equinix",city:"Seattle",state:"WA",status:"operational",mw:10,sqft:60000,tier:3,year:2002},
+  {name:"Microsoft Data Center",operator:"Microsoft",city:"Redmond",state:"WA",status:"operational",mw:95,sqft:560000,tier:null,year:2010},
+  {name:"Microsoft Quincy",operator:"Microsoft",city:"Quincy",state:"WA",status:"operational",mw:200,sqft:1100000,tier:null,year:2007},
+  {name:"Equinix PD9",operator:"Equinix",city:"Hillsboro",state:"OR",status:"operational",mw:22,sqft:130000,tier:3,year:2018},
+  {name:"Google The Dalles",operator:"Google",city:"The Dalles",state:"OR",status:"operational",mw:150,sqft:900000,tier:null,year:2006},
+  {name:"Equinix AT1",operator:"Equinix",city:"Atlanta",state:"GA",status:"operational",mw:14,sqft:83000,tier:3,year:2000},
+  {name:"QTS Atlanta",operator:"QTS",city:"Suwanee",state:"GA",status:"operational",mw:37,sqft:220000,tier:3,year:2012},
+  {name:"Switch Atlanta",operator:"Switch",city:"Atlanta",state:"GA",status:"announced",mw:100,sqft:600000,tier:4,year:2027},
+  {name:"Equinix DE1",operator:"Equinix",city:"Denver",state:"CO",status:"operational",mw:7,sqft:44000,tier:3,year:2003},
+  {name:"CyrusOne Denver",operator:"CyrusOne",city:"Aurora",state:"CO",status:"operational",mw:18,sqft:110000,tier:3,year:2017},
+  {name:"Switch SUPERNAP",operator:"Switch",city:"Las Vegas",state:"NV",status:"operational",mw:50,sqft:300000,tier:4,year:2007},
+  {name:"Switch SUPERNAP 10",operator:"Switch",city:"Las Vegas",state:"NV",status:"operational",mw:65,sqft:380000,tier:4,year:2019},
+  {name:"Equinix PI1",operator:"Equinix",city:"Pittsburgh",state:"PA",status:"operational",mw:6,sqft:35000,tier:3,year:2003},
+  {name:"Digital Realty PHL",operator:"Digital Realty",city:"Philadelphia",state:"PA",status:"operational",mw:9,sqft:54000,tier:3,year:2008},
+  {name:"Equinix BO1",operator:"Equinix",city:"Boston",state:"MA",status:"operational",mw:8,sqft:47000,tier:3,year:2000},
+  {name:"Digital Realty BOS",operator:"Digital Realty",city:"Somerville",state:"MA",status:"operational",mw:6,sqft:38000,tier:3,year:2011},
+  {name:"QTS Baltimore",operator:"QTS",city:"Baltimore",state:"MD",status:"operational",mw:20,sqft:120000,tier:3,year:2013},
+  {name:"Equinix DC2",operator:"Equinix",city:"Washington",state:"DC",status:"operational",mw:11,sqft:64000,tier:3,year:2001},
+  {name:"Equinix MI3",operator:"Equinix",city:"Miami",state:"FL",status:"operational",mw:13,sqft:77000,tier:3,year:2002},
+  {name:"NAP of the Americas",operator:"Equinix",city:"Miami",state:"FL",status:"operational",mw:10,sqft:60000,tier:3,year:2001},
+  {name:"Colo4 Tampa",operator:"Colo4",city:"Tampa",state:"FL",status:"operational",mw:8,sqft:48000,tier:2,year:2015},
+  {name:"CoreSite Nashville",operator:"CoreSite",city:"Nashville",state:"TN",status:"construction",mw:30,sqft:180000,tier:3,year:2025},
+  {name:"Evault St Louis",operator:"Evault",city:"St. Louis",state:"MO",status:"operational",mw:5,sqft:30000,tier:2,year:2010},
+  {name:"Sabey Minneapolis",operator:"Sabey Data Centers",city:"Minneapolis",state:"MN",status:"operational",mw:14,sqft:85000,tier:3,year:2018},
+  {name:"Flexential Dallas",operator:"Flexential",city:"Dallas",state:"TX",status:"operational",mw:12,sqft:72000,tier:3,year:2012},
+  {name:"Equinix LA1",operator:"Equinix",city:"Los Angeles",state:"CA",status:"operational",mw:12,sqft:70000,tier:3,year:2000},
+  {name:"Equinix SD2",operator:"Equinix",city:"San Diego",state:"CA",status:"operational",mw:8,sqft:46000,tier:3,year:2006},
+  {name:"Equinix PH1",operator:"Equinix",city:"Phoenix",state:"AZ",status:"operational",mw:9,sqft:52000,tier:3,year:2008},
+  {name:"Iron Mountain Phoenix",operator:"Iron Mountain",city:"Phoenix",state:"AZ",status:"operational",mw:16,sqft:96000,tier:3,year:2019},
+  {name:"Vantage Phoenix",operator:"Vantage Data Centers",city:"Goodyear",state:"AZ",status:"construction",mw:96,sqft:560000,tier:3,year:2026},
+  {name:"Equinix DT1",operator:"Equinix",city:"Detroit",state:"MI",status:"operational",mw:7,sqft:40000,tier:3,year:2008},
+  {name:"CBTS Cleveland",operator:"CBTS",city:"Cleveland",state:"OH",status:"operational",mw:4,sqft:25000,tier:2,year:2012},
+  {name:"Expedient Columbus",operator:"Expedient",city:"Columbus",state:"OH",status:"operational",mw:6,sqft:36000,tier:2,year:2014},
+  {name:"Paniolo Honolulu",operator:"Paniolo",city:"Honolulu",state:"HI",status:"operational",mw:3,sqft:18000,tier:2,year:2014},
+  {name:"GCI Anchorage",operator:"GCI",city:"Anchorage",state:"AK",status:"operational",mw:2,sqft:12000,tier:2,year:2011},
+  {name:"Rochester Colocation",operator:"RCN",city:"Rochester",state:"NY",status:"proposed",mw:15,sqft:90000,tier:2,year:2028},
+  {name:"Viawest Salt Lake City",operator:"Peak 10",city:"Salt Lake City",state:"UT",status:"operational",mw:8,sqft:47000,tier:3,year:2013},
+  {name:"Equinix SV8",operator:"Equinix",city:"San Jose",state:"CA",status:"operational",mw:20,sqft:120000,tier:3,year:2014},
+  {name:"Digital Realty ATL",operator:"Digital Realty",city:"Atlanta",state:"GA",status:"operational",mw:28,sqft:170000,tier:3,year:2016},
+];
+
+const HYPERSCALERS = new Set(["Amazon Web Services","Microsoft","Google","Meta","Oracle"]);
+const STATUS_COLOR = {
+  operational: "#4ade80",
+  construction: "#fbbf24",
+  announced: "#60a5fa",
+  proposed: "#a78bfa"
+};
+const STATUS_LABEL = {
+  operational: "Operational",
+  construction: "Under construction",
+  announced: "Announced",
+  proposed: "Proposed"
+};
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let activeStatuses = new Set(["operational","construction","announced","proposed"]);
+let activeOperator = "all";
+let selectedState = null;
+
+const tooltip = document.getElementById("tooltip");
+
+function showTip(html, e) {
+  tooltip.innerHTML = html;
+  tooltip.style.display = "block";
+  moveTip(e);
+}
+function moveTip(e) {
+  const x = e.clientX + 14, y = e.clientY - 10;
+  tooltip.style.left = Math.min(x, window.innerWidth - 240) + "px";
+  tooltip.style.top = y + "px";
+}
+function hideTip() { tooltip.style.display = "none"; }
+
+function getFiltered() {
+  return RAW.filter(d => {
+    if (!activeStatuses.has(d.status)) return false;
+    if (activeOperator === "Equinix" && d.operator !== "Equinix") return false;
+    if (activeOperator === "Digital Realty" && d.operator !== "Digital Realty") return false;
+    if (activeOperator === "Hyperscale" && !HYPERSCALERS.has(d.operator)) return false;
+    if (selectedState && d.state !== selectedState) return false;
+    return true;
+  });
+}
+
+function updateKPIs(data) {
+  const total = data.length;
+  const mw = d3.sum(data, d => d.mw || 0);
+  const pipeline = data.filter(d => d.status !== "operational").length;
+  d3.select("#kpi-total").text(total);
+  d3.select("#kpi-mw").text(mw.toLocaleString());
+  d3.select("#kpi-pipeline").text(pipeline);
+  d3.select("#active-n").text(total);
+}
+
+// ─── CHART 1: TIMELINE (area + line, cumulative MW) ──────────────────────────
+function drawTimeline(data) {
+  const el = document.getElementById("cell-timeline");
+  const W = el.clientWidth - 72, H = 200;
+  const svg = d3.select("#chart-timeline")
+    .attr("width", W).attr("height", H);
+  svg.selectAll("*").remove();
+
+  const opData = data.filter(d => d.year && d.year <= 2024);
+  const byYear = d3.rollup(opData, v => ({
+    count: v.length,
+    mw: d3.sum(v, d => d.mw || 0)
+  }), d => d.year);
+
+  const years = Array.from(byYear.keys()).sort(d3.ascending);
+  if (!years.length) return;
+
+  // Cumulative
+  let cumMW = 0, cumCount = 0;
+  const series = years.map(y => {
+    cumMW    += byYear.get(y).mw;
+    cumCount += byYear.get(y).count;
+    return { year: y, mw: cumMW, count: cumCount, addedMW: byYear.get(y).mw };
+  });
+
+  const m = { t: 10, r: 60, b: 36, l: 56 };
+  const iW = W - m.l - m.r;
+  const iH = H - m.t - m.b;
+
+  const x  = d3.scaleLinear().domain(d3.extent(series, d => d.year)).range([0, iW]);
+  const yM = d3.scaleLinear().domain([0, d3.max(series, d => d.mw) * 1.08]).range([iH, 0]);
+  const yC = d3.scaleLinear().domain([0, d3.max(series, d => d.count) * 1.1]).range([iH, 0]);
+
+  const g = svg.append("g").attr("transform", `translate(${m.l},${m.t})`);
+
+  // Gridlines
+  yM.ticks(4).forEach(t => {
+    g.append("line").attr("class","gridline")
+      .attr("x1",0).attr("x2",iW)
+      .attr("y1",yM(t)).attr("y2",yM(t));
+  });
+
+  // Area fill (MW)
+  const area = d3.area().x(d => x(d.year)).y0(iH).y1(d => yM(d.mw)).curve(d3.curveMonotoneX);
+  g.append("path").datum(series)
+    .attr("fill","#4ade8014").attr("stroke","none").attr("d", area);
+
+  // MW line
+  const line = d3.line().x(d => x(d.year)).y(d => yM(d.mw)).curve(d3.curveMonotoneX);
+  g.append("path").datum(series)
+    .attr("fill","none").attr("stroke","#4ade80").attr("stroke-width",2).attr("d", line);
+
+  // Count line
+  const lineC = d3.line().x(d => x(d.year)).y(d => yC(d.count)).curve(d3.curveMonotoneX);
+  g.append("path").datum(series)
+    .attr("fill","none").attr("stroke","#60a5fa").attr("stroke-width",1.5)
+    .attr("stroke-dasharray","4 3").attr("d", lineC);
+
+  // Dots
+  g.selectAll(".dot-mw").data(series).join("circle")
+    .attr("class","dot-mw").attr("cx", d => x(d.year)).attr("cy", d => yM(d.mw))
+    .attr("r", 3).attr("fill","#4ade80")
+    .style("cursor","pointer")
+    .on("mouseover", (e, d) => showTip(`<strong>${d.year}</strong>
+      <span class="tip-sub">Cumulative: ${d.mw.toLocaleString()} MW · ${d.count} facilities<br>Added this year: ${d.addedMW} MW</span>`, e))
+    .on("mousemove", moveTip).on("mouseout", hideTip);
+
+  // Axes
+  g.append("g").attr("transform",`translate(0,${iH})`).call(
+    d3.axisBottom(x).tickFormat(d3.format("d")).ticks(Math.min(years.length, 10))
+  ).select(".domain").remove();
+  g.append("g").call(d3.axisLeft(yM).ticks(4).tickFormat(d => d >= 1000 ? d/1000+"k" : d)).select(".domain").remove();
+  g.append("g").attr("transform",`translate(${iW},0)`).call(d3.axisRight(yC).ticks(4)).select(".domain").remove();
+
+  // Labels
+  g.append("text").attr("x", iW+14).attr("y", yC(series.at(-1).count) - 8)
+    .attr("fill","#60a5fa").attr("font-size",10).text("facilities →");
+  g.append("text").attr("x", 4).attr("y", yM(series.at(-1).mw) - 8)
+    .attr("fill","#4ade80").attr("font-size",10).text("MW →");
+
+  // Pipeline annotation
+  const pipe = data.filter(d => d.year > 2024);
+  if (pipe.length) {
+    const pipeMW = d3.sum(pipe, d => d.mw || 0);
+    const lastX = x(2024);
+    g.append("line").attr("x1",lastX).attr("x2",lastX).attr("y1",0).attr("y2",iH)
+      .attr("stroke","#fbbf24").attr("stroke-dasharray","4 3").attr("stroke-width",1);
+    g.append("text").attr("x",lastX+6).attr("y",24)
+      .attr("fill","#fbbf24").attr("font-size",10)
+      .text(`+${pipeMW} MW pipeline →`);
+  }
+}
+
+// ─── CHART 2: STATE BARS ──────────────────────────────────────────────────────
+function drawStates(data) {
+  const el = document.getElementById("cell-states");
+  const W = el.clientWidth - 72, H = 320;
+  const svg = d3.select("#chart-states").attr("width", W).attr("height", H);
+  svg.selectAll("*").remove();
+
+  const byState = d3.rollup(data, v => d3.sum(v, d => d.mw || 0), d => d.state);
+  const states = Array.from(byState, ([state, mw]) => ({ state, mw }))
+    .sort((a,b) => b.mw - a.mw).slice(0, 18);
+
+  const m = { t: 8, r: 20, b: 30, l: 36 };
+  const iW = W - m.l - m.r;
+  const iH = H - m.t - m.b;
+
+  const x = d3.scaleLinear().domain([0, d3.max(states, d => d.mw) * 1.05]).range([0, iW]);
+  const y = d3.scaleBand().domain(states.map(d => d.state)).range([0, iH]).padding(0.22);
+
+  const g = svg.append("g").attr("transform", `translate(${m.l},${m.t})`);
+
+  // Bars
+  g.selectAll("rect").data(states).join("rect")
+    .attr("x", 0).attr("y", d => y(d.state))
+    .attr("height", y.bandwidth())
+    .attr("width", d => x(d.mw))
+    .attr("rx", 2)
+    .attr("fill", d => d.state === selectedState ? "#f0f7f0" : "#4ade8066")
+    .style("cursor","pointer")
+    .on("click", (e, d) => {
+      selectedState = selectedState === d.state ? null : d.state;
+      renderAll();
+    })
+    .on("mouseover", (e, d) => showTip(`<strong>${d.state}</strong><span class="tip-sub">${d.mw.toLocaleString()} MW total<br>Click to filter</span>`, e))
+    .on("mousemove", moveTip).on("mouseout", hideTip);
+
+  // Value labels
+  g.selectAll(".bar-label").data(states).join("text")
+    .attr("class","bar-label")
+    .attr("x", d => x(d.mw) + 5).attr("y", d => y(d.state) + y.bandwidth()/2)
+    .attr("dominant-baseline","middle").attr("fill","#5a7060").attr("font-size",10)
+    .text(d => d.mw >= 1000 ? (d.mw/1000).toFixed(1)+"k" : d.mw);
+
+  // Y axis (state labels)
+  g.append("g").call(d3.axisLeft(y).tickSize(0).tickPadding(6))
+    .select(".domain").remove();
+
+  // X axis
+  g.append("g").attr("transform",`translate(0,${iH})`).call(
+    d3.axisBottom(x).ticks(4).tickFormat(d => d >= 1000 ? d/1000+"k" : d)
+  ).select(".domain").remove();
+
+  if (selectedState) {
+    g.append("text").attr("x",iW).attr("y",-2).attr("text-anchor","end")
+      .attr("fill","#f0f7f0").attr("font-size",10).text(`Filtered: ${selectedState} ✕`);
+  }
+}
+
+// ─── CHART 3: OPERATORS (horizontal bars, grouped by type) ───────────────────
+function drawOperators(data) {
+  const el = document.getElementById("cell-operators");
+  const W = el.clientWidth - 72, H = 320;
+  const svg = d3.select("#chart-operators").attr("width", W).attr("height", H);
+  svg.selectAll("*").remove();
+
+  // Group small operators
+  const byOp = d3.rollup(data, v => ({
+    mw: d3.sum(v, d => d.mw || 0),
+    count: v.length,
+    isHyper: HYPERSCALERS.has(v[0].operator)
+  }), d => d.operator);
+
+  let ops = Array.from(byOp, ([op, v]) => ({ op, ...v }))
+    .sort((a,b) => b.mw - a.mw);
+
+  const TOP = 14;
+  if (ops.length > TOP) {
+    const rest = ops.slice(TOP);
+    ops = ops.slice(0, TOP);
+    ops.push({ op: "Other", mw: d3.sum(rest, d => d.mw), count: d3.sum(rest, d => d.count), isHyper: false });
+  }
+
+  const m = { t: 8, r: 70, b: 30, l: 110 };
+  const iW = W - m.l - m.r;
+  const iH = H - m.t - m.b;
+
+  const x = d3.scaleLinear().domain([0, d3.max(ops, d => d.mw) * 1.05]).range([0, iW]);
+  const y = d3.scaleBand().domain(ops.map(d => d.op)).range([0, iH]).padding(0.22);
+
+  const g = svg.append("g").attr("transform", `translate(${m.l},${m.t})`);
+
+  g.selectAll("rect").data(ops).join("rect")
+    .attr("x",0).attr("y", d => y(d.op))
+    .attr("height", y.bandwidth()).attr("width", d => x(d.mw))
+    .attr("rx",2)
+    .attr("fill", d => {
+      if (d.op === "Other") return "#3a4a40";
+      return d.isHyper ? "#fbbf2466" : "#4ade8066";
+    })
+    .style("cursor","pointer")
+    .on("mouseover", (e, d) => showTip(
+      `<strong>${d.op}</strong><span class="tip-sub">${d.mw.toLocaleString()} MW · ${d.count} facilities${d.isHyper ? "<br>Hyperscaler" : ""}</span>`, e))
+    .on("mousemove", moveTip).on("mouseout", hideTip);
+
+  // MW labels
+  g.selectAll(".op-label").data(ops).join("text")
+    .attr("class","op-label")
+    .attr("x", d => x(d.mw) + 5).attr("y", d => y(d.op) + y.bandwidth()/2)
+    .attr("dominant-baseline","middle").attr("fill","#5a7060").attr("font-size",10)
+    .text(d => `${d.mw >= 1000 ? (d.mw/1000).toFixed(1)+"k" : d.mw} MW`);
+
+  g.append("g").call(d3.axisLeft(y).tickSize(0).tickPadding(8))
+    .select(".domain").remove();
+  g.append("g").attr("transform",`translate(0,${iH})`).call(
+    d3.axisBottom(x).ticks(4).tickFormat(d => d >= 1000 ? d/1000+"k" : d)
+  ).select(".domain").remove();
+
+  // Legend
+  const leg = g.append("g").attr("transform",`translate(${iW-60}, 0)`);
+  [["#4ade8066","Colo/managed"],["#fbbf2466","Hyperscaler"]].forEach(([c,l],i) => {
+    leg.append("rect").attr("x",0).attr("y",i*18).attr("width",10).attr("height",10).attr("rx",2).attr("fill",c);
+    leg.append("text").attr("x",14).attr("y",i*18+5).attr("dominant-baseline","middle")
+      .attr("fill","#5a7060").attr("font-size",10).text(l);
+  });
+}
+
+// ─── CHART 4: STATUS DONUT ───────────────────────────────────────────────────
+function drawStatus(data) {
+  const el = document.getElementById("cell-status");
+  const W = el.clientWidth - 72, H = 260;
+  const svg = d3.select("#chart-status").attr("width", W).attr("height", H);
+  svg.selectAll("*").remove();
+
+  const byStatus = d3.rollup(data, v => ({
+    count: v.length, mw: d3.sum(v, d => d.mw||0)
+  }), d => d.status);
+
+  const statuses = ["operational","construction","announced","proposed"]
+    .filter(s => byStatus.has(s))
+    .map(s => ({ status: s, ...byStatus.get(s) }));
+
+  const cx = W * 0.36, cy = H / 2, R = Math.min(cx, cy) - 20, r = R * 0.52;
+
+  const pie = d3.pie().value(d => d.mw).sort(null);
+  const arc = d3.arc().innerRadius(r).outerRadius(R);
+  const arcH = d3.arc().innerRadius(r).outerRadius(R + 6);
+
+  const g = svg.append("g").attr("transform", `translate(${cx},${cy})`);
+  const totalMW = d3.sum(statuses, d => d.mw);
+
+  g.selectAll("path").data(pie(statuses)).join("path")
+    .attr("d", arc)
+    .attr("fill", d => STATUS_COLOR[d.data.status])
+    .attr("fill-opacity", 0.8)
+    .attr("stroke", "#0b0f0e").attr("stroke-width", 2)
+    .style("cursor","pointer")
+    .on("mouseover", function(e, d) {
+      d3.select(this).attr("d", arcH);
+      showTip(`<strong>${STATUS_LABEL[d.data.status]}</strong>
+        <span class="tip-sub">${d.data.count} facilities · ${d.data.mw.toLocaleString()} MW<br>${(d.data.mw/totalMW*100).toFixed(1)}% of total capacity</span>`, e);
+    })
+    .on("mousemove", moveTip)
+    .on("mouseout", function(e, d) { d3.select(this).attr("d", arc); hideTip(); });
+
+  // Centre label
+  g.append("text").attr("text-anchor","middle").attr("dy","-0.3em")
+    .attr("fill","#f0f7f0").attr("font-size",22).attr("font-family","'Fraunces',serif").attr("font-weight",700)
+    .text(totalMW.toLocaleString());
+  g.append("text").attr("text-anchor","middle").attr("dy","1.2em")
+    .attr("fill","#5a7060").attr("font-size",10).attr("letter-spacing","0.1em")
+    .text("TOTAL MW");
+
+  // Legend
+  const lx = cx * 2 + 16, ly = (H - statuses.length * 44) / 2;
+  const leg = svg.append("g").attr("transform",`translate(${lx},${ly})`);
+  statuses.forEach((s, i) => {
+    const gy = i * 50;
+    leg.append("rect").attr("x",0).attr("y",gy).attr("width",12).attr("height",12)
+      .attr("rx",2).attr("fill", STATUS_COLOR[s.status]);
+    leg.append("text").attr("x",18).attr("y",gy+6).attr("dominant-baseline","middle")
+      .attr("fill","#d4e8d8").attr("font-size",12).text(STATUS_LABEL[s.status]);
+    leg.append("text").attr("x",18).attr("y",gy+20).attr("dominant-baseline","middle")
+      .attr("fill","#5a7060").attr("font-size",11)
+      .text(`${s.count} facilities · ${s.mw.toLocaleString()} MW`);
+  });
+}
+
+// ─── CHART 5: SCATTER (year vs MW, sized by sqft) ────────────────────────────
+function drawScatter(data) {
+  const el = document.getElementById("cell-scatter");
+  const W = el.clientWidth - 72, H = 260;
+  const svg = d3.select("#chart-scatter").attr("width", W).attr("height", H);
+  svg.selectAll("*").remove();
+
+  const pts = data.filter(d => d.year && d.mw);
+
+  const m = { t: 10, r: 20, b: 36, l: 44 };
+  const iW = W - m.l - m.r;
+  const iH = H - m.t - m.b;
+
+  const x  = d3.scaleLinear().domain([1998, 2029]).range([0, iW]);
+  const y  = d3.scaleLinear().domain([0, d3.max(pts, d => d.mw) * 1.1]).range([iH, 0]);
+  const r  = d3.scaleSqrt().domain([0, d3.max(pts, d => d.sqft||0)]).range([3, 18]);
+
+  const g = svg.append("g").attr("transform", `translate(${m.l},${m.t})`);
+
+  // Grid
+  y.ticks(4).forEach(t => {
+    g.append("line").attr("class","gridline").attr("x1",0).attr("x2",iW).attr("y1",y(t)).attr("y2",y(t));
+  });
+
+  // "Now" line
+  g.append("line").attr("x1",x(2024.5)).attr("x2",x(2024.5)).attr("y1",0).attr("y2",iH)
+    .attr("stroke","#fbbf24").attr("stroke-dasharray","3 3").attr("stroke-width",1);
+  g.append("text").attr("x",x(2024.5)+4).attr("y",10)
+    .attr("fill","#fbbf2488").attr("font-size",9).text("now");
+
+  // Dots
+  g.selectAll("circle").data(pts).join("circle")
+    .attr("cx", d => x(d.year))
+    .attr("cy", d => y(d.mw))
+    .attr("r",  d => r(d.sqft || 50000))
+    .attr("fill", d => STATUS_COLOR[d.status])
+    .attr("fill-opacity", 0.65)
+    .attr("stroke", d => STATUS_COLOR[d.status])
+    .attr("stroke-width", 1)
+    .style("cursor","pointer")
+    .on("mouseover", (e, d) => showTip(
+      `<strong>${d.name}</strong>
+       <span class="tip-sub">${d.operator}<br>${d.city}, ${d.state}<br>${d.mw} MW${d.sqft ? ` · ${(d.sqft/1000).toFixed(0)}k sq ft` : ""}<br>${STATUS_LABEL[d.status]}</span>`, e))
+    .on("mousemove", moveTip).on("mouseout", hideTip);
+
+  // Axes
+  g.append("g").attr("transform",`translate(0,${iH})`).call(
+    d3.axisBottom(x).tickFormat(d3.format("d")).ticks(8)
+  ).select(".domain").remove();
+  g.append("g").call(
+    d3.axisLeft(y).ticks(4).tickFormat(d => d >= 1000 ? d/1000+"k" : d)
+  ).select(".domain").remove();
+
+  g.append("text").attr("x",-m.l+4).attr("y",iH/2).attr("transform",`rotate(-90,-${m.l-4},${iH/2})`)
+    .attr("fill","#5a7060").attr("font-size",10).attr("text-anchor","middle").text("MW");
+}
+
+// ─── RENDER ALL ──────────────────────────────────────────────────────────────
+function renderAll() {
+  const data = getFiltered();
+  updateKPIs(data);
+  drawTimeline(data);
+  drawStates(data);
+  drawOperators(data);
+  drawStatus(data);
+  drawScatter(data);
+}
+
+// ─── FILTER CONTROLS ─────────────────────────────────────────────────────────
+document.querySelectorAll("[data-status]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    const s = btn.dataset.status;
+    if (activeStatuses.has(s)) {
+      if (activeStatuses.size === 1) return; // keep at least one
+      activeStatuses.delete(s);
+      btn.classList.remove("active");
+    } else {
+      activeStatuses.add(s);
+      btn.classList.add("active");
+    }
+    renderAll();
+  });
+});
+
+document.querySelectorAll("[data-operator]").forEach(btn => {
+  btn.addEventListener("click", () => {
+    document.querySelectorAll("[data-operator]").forEach(b => b.classList.remove("active"));
+    activeOperator = btn.dataset.operator;
+    btn.classList.add("active");
+    renderAll();
+  });
+});
+
+document.getElementById("reset-btn").addEventListener("click", () => {
+  activeStatuses = new Set(["operational","construction","announced","proposed"]);
+  activeOperator = "all";
+  selectedState = null;
+  document.querySelectorAll("[data-status]").forEach(b => b.classList.add("active"));
+  document.querySelectorAll("[data-operator]").forEach(b => b.classList.remove("active"));
+  document.querySelector("[data-operator='all']").classList.add("active");
+  renderAll();
+});
+
+// ─── EXPORT PNG ──────────────────────────────────────────────────────────────
+document.getElementById("export-btn").addEventListener("click", () => {
+  // Use browser print dialog for best fidelity
+  window.print();
+});
+
+// ─── RESPONSIVE RESIZE ───────────────────────────────────────────────────────
+let resizeTimer;
+window.addEventListener("resize", () => {
+  clearTimeout(resizeTimer);
+  resizeTimer = setTimeout(renderAll, 150);
+});
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+renderAll();
+</script>
+</body>
+</html>
