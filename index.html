@@ -371,7 +371,6 @@ svg text { font-family: var(--mono); }
 </footer>
 
 <script>
-// ─── DATA ────────────────────────────────────────────────────────────────────
 const RAW = [
   {name:"Equinix DC1",operator:"Equinix",city:"Ashburn",state:"VA",status:"operational",mw:60,sqft:345000,tier:3,year:1999},
   {name:"Equinix DC10",operator:"Equinix",city:"Ashburn",state:"VA",status:"operational",mw:70,sqft:410000,tier:3,year:2010},
@@ -388,6 +387,7 @@ const RAW = [
   {name:"Aligned DFW",operator:"Aligned Data Centers",city:"Irving",state:"TX",status:"operational",mw:50,sqft:310000,tier:3,year:2017},
   {name:"AWS DFW Campus",operator:"Amazon Web Services",city:"Northlake",state:"TX",status:"construction",mw:200,sqft:1200000,tier:null,year:2026},
   {name:"CyrusOne Houston",operator:"CyrusOne",city:"Houston",state:"TX",status:"operational",mw:22,sqft:135000,tier:3,year:2014},
+  {name:"Google Midlothian",operator:"Google",city:"Midlothian",state:"TX",status:"announced",mw:150,sqft:900000,tier:null,year:2027},
   {name:"Equinix NY4",operator:"Equinix",city:"Secaucus",state:"NJ",status:"operational",mw:19,sqft:112000,tier:3,year:2000},
   {name:"Equinix NY5",operator:"Equinix",city:"Secaucus",state:"NJ",status:"operational",mw:18,sqft:104000,tier:3,year:2003},
   {name:"Digital Realty NYC",operator:"Digital Realty",city:"Brooklyn",state:"NY",status:"operational",mw:12,sqft:75000,tier:3,year:2012},
@@ -404,4 +404,287 @@ const RAW = [
   {name:"QTS Atlanta",operator:"QTS",city:"Suwanee",state:"GA",status:"operational",mw:37,sqft:220000,tier:3,year:2012},
   {name:"Switch Atlanta",operator:"Switch",city:"Atlanta",state:"GA",status:"announced",mw:100,sqft:600000,tier:4,year:2027},
   {name:"Equinix DE1",operator:"Equinix",city:"Denver",state:"CO",status:"operational",mw:7,sqft:44000,tier:3,year:2003},
-  {name:"CyrusOne Denver",operator:"CyrusOne",
+  {name:"CyrusOne Denver",operator:"CyrusOne",city:"Aurora",state:"CO",status:"construction",mw:36,sqft:195000,tier:3,year:2026},
+  {name:"Meta Mesa",operator:"Meta",city:"Mesa",state:"AZ",status:"operational",mw:180,sqft:980000,tier:null,year:2024},
+  {name:"Google Columbus",operator:"Google",city:"Columbus",state:"OH",status:"operational",mw:120,sqft:750000,tier:null,year:2023},
+  {name:"AWS Columbus",operator:"Amazon Web Services",city:"Hilliard",state:"OH",status:"proposed",mw:90,sqft:540000,tier:null,year:2028},
+  {name:"Microsoft Goodyear",operator:"Microsoft",city:"Goodyear",state:"AZ",status:"construction",mw:140,sqft:870000,tier:null,year:2026},
+  {name:"Apple Waukee",operator:"Apple",city:"Waukee",state:"IA",status:"operational",mw:75,sqft:460000,tier:null,year:2022},
+  {name:"CoreSite LA1",operator:"American Tower",city:"Los Angeles",state:"CA",status:"operational",mw:24,sqft:125000,tier:3,year:2011},
+  {name:"Digital Realty PHX",operator:"Digital Realty",city:"Phoenix",state:"AZ",status:"operational",mw:55,sqft:300000,tier:3,year:2018}
+];
+
+const STATUS_ORDER = ["operational", "construction", "announced", "proposed"];
+const STATUS_LABEL = {
+  operational: "Operational",
+  construction: "Under construction",
+  announced: "Announced",
+  proposed: "Proposed"
+};
+const STATUS_COLOR = {
+  operational: "var(--accent)",
+  construction: "var(--amber)",
+  announced: "var(--blue)",
+  proposed: "var(--purple)"
+};
+const HYPERSCALE = new Set(["Amazon Web Services", "Google", "Meta", "Microsoft", "Oracle", "Apple"]);
+
+const state = {
+  statuses: new Set(STATUS_ORDER),
+  operatorFilter: "all",
+  focusState: null,
+  focusOperator: null,
+  focusStatus: null
+};
+
+const tooltip = d3.select("#tooltip");
+
+function fmtInt(n) { return d3.format(",")(Math.round(n)); }
+function byFilter(d) {
+  const statusOk = state.statuses.has(d.status);
+  const operatorOk = state.operatorFilter === "all"
+    ? true
+    : state.operatorFilter === "Hyperscale"
+      ? HYPERSCALE.has(d.operator)
+      : d.operator === state.operatorFilter;
+  const stateOk = state.focusState ? d.state === state.focusState : true;
+  const focusOpOk = state.focusOperator ? d.operator === state.focusOperator : true;
+  const focusStatusOk = state.focusStatus ? d.status === state.focusStatus : true;
+  return statusOk && operatorOk && stateOk && focusOpOk && focusStatusOk;
+}
+function filtered() { return RAW.filter(byFilter); }
+
+function showTip(event, html) {
+  tooltip.style("display", "block").html(html);
+  moveTip(event);
+}
+function moveTip(event) {
+  tooltip.style("left", `${event.clientX + 14}px`).style("top", `${event.clientY + 14}px`);
+}
+function hideTip() { tooltip.style("display", "none"); }
+
+function updateHeader(data) {
+  const total = data.length;
+  const mw = d3.sum(data, d => d.mw);
+  const pipeline = data.filter(d => d.status !== "operational").length;
+  d3.select("#meta-count").text(fmtInt(total));
+  d3.select("#meta-mw").text(`${fmtInt(mw)} MW`);
+  d3.select("#kpi-total").text(fmtInt(total));
+  d3.select("#kpi-mw").text(fmtInt(mw));
+  d3.select("#kpi-pipeline").text(fmtInt(pipeline));
+  d3.select("#active-n").text(fmtInt(total));
+}
+
+function drawTimeline(data) {
+  const svg = d3.select("#chart-timeline");
+  const width = document.querySelector("#cell-timeline").clientWidth - 72;
+  const height = 260;
+  svg.attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height);
+  svg.selectAll("*").remove();
+
+  if (!data.length) return;
+
+  const yearly = d3.rollups(data, v => ({ count: v.length, mw: d3.sum(v, d => d.mw) }), d => d.year)
+    .map(([year, v]) => ({ year: +year, count: v.count, mw: v.mw }))
+    .sort((a, b) => a.year - b.year);
+
+  let runningCount = 0, runningMw = 0;
+  yearly.forEach(d => { runningCount += d.count; runningMw += d.mw; d.cumCount = runningCount; d.cumMw = runningMw; });
+
+  const m = { top: 10, right: 46, bottom: 30, left: 46 };
+  const x = d3.scaleLinear().domain(d3.extent(yearly, d => d.year)).range([m.left, width - m.right]);
+  const yL = d3.scaleLinear().domain([0, d3.max(yearly, d => d.cumMw) * 1.1]).nice().range([height - m.bottom, m.top]);
+  const yR = d3.scaleLinear().domain([0, d3.max(yearly, d => d.cumCount) * 1.1]).nice().range([height - m.bottom, m.top]);
+
+  svg.append("g").attr("transform", `translate(0,${height - m.bottom})`).call(d3.axisBottom(x).ticks(8).tickFormat(d3.format("d")));
+  svg.append("g").attr("transform", `translate(${m.left},0)`).call(d3.axisLeft(yL).ticks(5));
+  svg.append("g").attr("transform", `translate(${width - m.right},0)`).call(d3.axisRight(yR).ticks(5));
+
+  const lineMw = d3.line().x(d => x(d.year)).y(d => yL(d.cumMw)).curve(d3.curveMonotoneX);
+  const lineCount = d3.line().x(d => x(d.year)).y(d => yR(d.cumCount)).curve(d3.curveMonotoneX);
+  svg.append("path").datum(yearly).attr("fill", "none").attr("stroke", "var(--accent)").attr("stroke-width", 2.5).attr("d", lineMw);
+  svg.append("path").datum(yearly).attr("fill", "none").attr("stroke", "var(--mid)").attr("stroke-width", 2).attr("stroke-dasharray", "4 4").attr("d", lineCount);
+
+  svg.selectAll(".dot-mw").data(yearly).join("circle")
+    .attr("class", "dot-mw").attr("cx", d => x(d.year)).attr("cy", d => yL(d.cumMw)).attr("r", 3.5).attr("fill", "var(--accent)")
+    .style("cursor", "pointer")
+    .on("mousemove", (event, d) => showTip(event, `<strong>${d.year}</strong>Capacity: ${fmtInt(d.cumMw)} MW<br/>Facilities: ${fmtInt(d.cumCount)}`))
+    .on("mouseleave", hideTip);
+
+  svg.append("text").attr("x", m.left).attr("y", 12).attr("fill", "var(--accent)").text("Cumulative MW");
+  svg.append("text").attr("x", width - m.right).attr("y", 12).attr("text-anchor", "end").attr("fill", "var(--mid)").text("Cumulative facilities");
+}
+
+function drawStates(data) {
+  const svg = d3.select("#chart-states");
+  const width = document.querySelector("#cell-states").clientWidth - 72;
+  const height = 260;
+  svg.attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height);
+  svg.selectAll("*").remove();
+  if (!data.length) return;
+
+  const rows = d3.rollups(data, v => d3.sum(v, d => d.mw), d => d.state)
+    .map(([stateCode, mw]) => ({ state: stateCode, mw }))
+    .sort((a, b) => d3.descending(a.mw, b.mw)).slice(0, 10);
+
+  const m = { top: 10, right: 10, bottom: 30, left: 48 };
+  const x = d3.scaleLinear().domain([0, d3.max(rows, d => d.mw) * 1.1]).range([m.left, width - m.right]);
+  const y = d3.scaleBand().domain(rows.map(d => d.state)).range([m.top, height - m.bottom]).padding(0.2);
+
+  svg.append("g").attr("transform", `translate(0,${height - m.bottom})`).call(d3.axisBottom(x).ticks(5));
+  svg.append("g").attr("transform", `translate(${m.left},0)`).call(d3.axisLeft(y));
+
+  svg.selectAll("rect").data(rows).join("rect")
+    .attr("x", m.left).attr("y", d => y(d.state)).attr("height", y.bandwidth())
+    .attr("width", d => x(d.mw) - m.left)
+    .attr("fill", d => state.focusState === d.state ? "var(--charcoal)" : "var(--accent)")
+    .style("cursor", "pointer")
+    .on("click", (_, d) => { state.focusState = state.focusState === d.state ? null : d.state; render(); })
+    .on("mousemove", (event, d) => showTip(event, `<strong>${d.state}</strong>${fmtInt(d.mw)} MW`))
+    .on("mouseleave", hideTip);
+}
+
+function drawOperators(data) {
+  const svg = d3.select("#chart-operators");
+  const width = document.querySelector("#cell-operators").clientWidth - 72;
+  const height = 260;
+  svg.attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height);
+  svg.selectAll("*").remove();
+  if (!data.length) return;
+
+  const rows = d3.rollups(data, v => d3.sum(v, d => d.mw), d => d.operator)
+    .map(([operator, mw]) => ({ operator, mw }))
+    .sort((a, b) => d3.descending(a.mw, b.mw)).slice(0, 8);
+
+  const m = { top: 10, right: 10, bottom: 80, left: 42 };
+  const x = d3.scaleBand().domain(rows.map(d => d.operator)).range([m.left, width - m.right]).padding(0.2);
+  const y = d3.scaleLinear().domain([0, d3.max(rows, d => d.mw) * 1.1]).range([height - m.bottom, m.top]);
+
+  svg.append("g").attr("transform", `translate(0,${height - m.bottom})`)
+    .call(d3.axisBottom(x).tickFormat(d => d.length > 12 ? `${d.slice(0, 12)}…` : d))
+    .selectAll("text").attr("transform", "rotate(-30)").style("text-anchor", "end");
+  svg.append("g").attr("transform", `translate(${m.left},0)`).call(d3.axisLeft(y).ticks(5));
+
+  svg.selectAll("rect").data(rows).join("rect")
+    .attr("x", d => x(d.operator)).attr("y", d => y(d.mw))
+    .attr("width", x.bandwidth()).attr("height", d => height - m.bottom - y(d.mw))
+    .attr("fill", d => state.focusOperator === d.operator ? "var(--charcoal)" : "var(--mid)")
+    .style("cursor", "pointer")
+    .on("click", (_, d) => { state.focusOperator = state.focusOperator === d.operator ? null : d.operator; render(); })
+    .on("mousemove", (event, d) => showTip(event, `<strong>${d.operator}</strong>${fmtInt(d.mw)} MW`))
+    .on("mouseleave", hideTip);
+}
+
+function drawStatus(data) {
+  const svg = d3.select("#chart-status");
+  const width = document.querySelector("#cell-status").clientWidth - 72;
+  const height = 260;
+  svg.attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height);
+  svg.selectAll("*").remove();
+  if (!data.length) return;
+
+  const totals = STATUS_ORDER.map(status => ({
+    status,
+    value: d3.sum(data.filter(d => d.status === status), d => d.mw)
+  })).filter(d => d.value > 0);
+  const pie = d3.pie().value(d => d.value)(totals);
+  const radius = Math.min(width, height) * 0.32;
+  const g = svg.append("g").attr("transform", `translate(${width / 2},${height / 2})`);
+  const arc = d3.arc().innerRadius(radius * 0.45).outerRadius(radius);
+
+  g.selectAll("path").data(pie).join("path")
+    .attr("d", arc)
+    .attr("fill", d => STATUS_COLOR[d.data.status])
+    .attr("stroke", "white").attr("stroke-width", 2)
+    .style("cursor", "pointer")
+    .on("click", (_, d) => { state.focusStatus = state.focusStatus === d.data.status ? null : d.data.status; render(); })
+    .on("mousemove", (event, d) => showTip(event, `<strong>${STATUS_LABEL[d.data.status]}</strong>${fmtInt(d.data.value)} MW`))
+    .on("mouseleave", hideTip);
+
+  const labelArc = d3.arc().innerRadius(radius * 1.05).outerRadius(radius * 1.05);
+  g.selectAll("text").data(pie).join("text")
+    .attr("transform", d => `translate(${labelArc.centroid(d)})`)
+    .attr("text-anchor", "middle")
+    .attr("font-size", 11)
+    .text(d => STATUS_LABEL[d.data.status]);
+}
+
+function drawScatter(data) {
+  const svg = d3.select("#chart-scatter");
+  const width = document.querySelector("#cell-scatter").clientWidth - 72;
+  const height = 260;
+  svg.attr("viewBox", `0 0 ${width} ${height}`).attr("width", "100%").attr("height", height);
+  svg.selectAll("*").remove();
+  if (!data.length) return;
+
+  const m = { top: 10, right: 10, bottom: 30, left: 44 };
+  const x = d3.scaleLinear().domain(d3.extent(data, d => d.year)).nice().range([m.left, width - m.right]);
+  const y = d3.scaleLinear().domain([0, d3.max(data, d => d.mw) * 1.1]).range([height - m.bottom, m.top]);
+  const r = d3.scaleSqrt().domain([d3.min(data, d => d.sqft), d3.max(data, d => d.sqft)]).range([4, 18]);
+
+  svg.append("g").attr("transform", `translate(0,${height - m.bottom})`).call(d3.axisBottom(x).ticks(7).tickFormat(d3.format("d")));
+  svg.append("g").attr("transform", `translate(${m.left},0)`).call(d3.axisLeft(y).ticks(5));
+
+  svg.selectAll("circle").data(data).join("circle")
+    .attr("cx", d => x(d.year)).attr("cy", d => y(d.mw)).attr("r", d => r(d.sqft))
+    .attr("fill", d => STATUS_COLOR[d.status]).attr("fill-opacity", 0.65).attr("stroke", "var(--mid)")
+    .on("mousemove", (event, d) => showTip(event, `<strong>${d.name}</strong>${d.city}, ${d.state}<br/>${d.operator}<br/>${fmtInt(d.mw)} MW · ${fmtInt(d.sqft)} sqft`))
+    .on("mouseleave", hideTip);
+}
+
+function syncChips() {
+  d3.selectAll("button[data-status]").classed("active", function() {
+    const v = this.dataset.status;
+    return state.statuses.has(v);
+  });
+
+  d3.selectAll("button[data-operator]").classed("active", function() {
+    return this.dataset.operator === state.operatorFilter;
+  });
+}
+
+function render() {
+  syncChips();
+  const data = filtered();
+  updateHeader(data);
+  drawTimeline(data);
+  drawStates(data);
+  drawOperators(data);
+  drawStatus(data);
+  drawScatter(data);
+}
+
+function setupUI() {
+  d3.selectAll("button[data-status]").on("click", function() {
+    const status = this.dataset.status;
+    if (state.statuses.has(status)) {
+      if (state.statuses.size > 1) state.statuses.delete(status);
+    } else {
+      state.statuses.add(status);
+    }
+    render();
+  });
+
+  d3.selectAll("button[data-operator]").on("click", function() {
+    state.operatorFilter = this.dataset.operator;
+    render();
+  });
+
+  d3.select("#reset-btn").on("click", () => {
+    state.statuses = new Set(STATUS_ORDER);
+    state.operatorFilter = "all";
+    state.focusState = null;
+    state.focusOperator = null;
+    state.focusStatus = null;
+    render();
+  });
+
+  d3.select("#export-btn").on("click", () => window.print());
+  window.addEventListener("resize", render);
+}
+
+setupUI();
+render();
+</script>
+</body>
+</html>
